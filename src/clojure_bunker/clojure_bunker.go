@@ -51,12 +51,8 @@ func (ed *editor) refresh () {
   codeStr := cu.UnParseClj(ed.tree)
   active := ed.tree.Active.Data.(*cu.Token)
   printNode := fmt.Sprintf("\x1b[15;0H\x1b[K%v", active)
-  cursorJump := fmt.Sprintf(
-    "\x1b[%d;%dH",
-    active.Row+1, active.Col+1,
-    //15, 0,
-  )
-  fmt.Print(clearScreen, cursorHome, codeStr, printNode, cursorJump)
+  cursorJumpStr := fmt.Sprintf(cursorJump, active.Row+1, active.Col+1)
+  fmt.Print(clearScreen, cursorHome, codeStr, printNode, cursorJumpStr)
   //traverseFn := func (n *u.TreeNode) {
   //  token := *n.Data.(*cu.Token)
   //  fmt.Printf("\x1b[15;0H\x1b[K%v\x1b[%d;%dH", token, token.Row, token.Col)
@@ -91,7 +87,8 @@ func (ed *editor) handleInput(c rune) {
   case 'w': ed.writeFile()
   }
   if err != nil {
-    printMsg("Fail")
+    panic(err)
+    //printMsg("Fail")
   }
 }
 

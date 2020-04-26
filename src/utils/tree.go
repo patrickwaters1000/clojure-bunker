@@ -157,6 +157,23 @@ func (t *Tree) DepthFirstTraverse (f func (*TreeNode)) {
   }
 }
 
+func (t *Tree) DepthFirstTraverseNoRoot (f func (*TreeNode)) {
+  var s = NewStack()
+  var n *TreeNode
+  for _,c := range(t.Root.Children) {
+    s.Push(c)
+  }
+  for !s.Empty() {
+    n = (s.Pop()).(*TreeNode)
+    f(n)
+    l := len(n.Children)
+    for i:=l-1; i>=0; i-- {
+      s.Push(n.Children[i])
+    }
+  }
+}
+
+
 /*func (t *Tree) Print (strFn func(interface{}) string) {
   t.DepthFirstTraverse(
     func(n *TreeNode) {

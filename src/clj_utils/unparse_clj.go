@@ -112,7 +112,7 @@ func newLineRequired (n *u.TreeNode) bool {
 //}
 
 func getRow(n *u.TreeNode, previousToken *Token) int {
-  if n.Parent == nil {
+  if previousToken == nil || n.Parent == nil {
     return 0
   }
   previousRow := previousToken.Row
@@ -127,7 +127,7 @@ func getRow(n *u.TreeNode, previousToken *Token) int {
 }
 
 func getCol(n *u.TreeNode, previousToken *Token) int {
-  if n.Parent == nil {
+  if previousToken == nil || n.Parent == nil {
     return 0
   }
   if newLineRequired(n) {
@@ -158,23 +158,18 @@ func UnParseClj(tree *u.Tree) string {
   var previousToken *Token
   traverseFn := func (n *u.TreeNode) {
     token := n.Data.(*Token)
-    if (token.Class=="symbol" && token.Value=="root") {
-      token.Row = 0
-      token.Col = -4
-    } else {
-      token.Row = getRow(n, previousToken)
-      token.Col = getCol(n, previousToken)
-      if spaceRequired(n) {
-        w.write(" ")
-      }
-      if newLineRequired(n) {
-        w.newLine(token.Col)
-      }
-      w.write(token.Value)
+    token.Row = getRow(n, previousToken)
+    token.Col = getCol(n, previousToken)
+    if spaceRequired(n) {
+      w.write(" ")
     }
+    if newLineRequired(n) {
+      w.newLine(token.Col)
+    }
+    w.write(token.Value)
     previousToken = token
   }
-  tree.DepthFirstTraverse(traverseFn)
+  tree.DepthFirstTraverseNoRoot(traverseFn)
   return w.Buffer
 }
 
