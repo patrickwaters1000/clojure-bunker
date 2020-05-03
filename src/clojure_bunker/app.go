@@ -1,119 +1,141 @@
 package main
 
 import (
-  "bufio"
-  "fmt"
-  "os"
+  //"bufio"
+  //"fmt"
+  //"os"
   //"unicode"
-  "golang.org/x/crypto/ssh/terminal"
-  u "utils"
-  cu "clj_utils"
-  "io/ioutil"
+  "errors"
+  termbox "github.com/nsf/termbox-go"
+  //u "utils"
+  //cu "clj_utils"
+  //"io/ioutil"
 )
 
-var enterKey rune = 13
-var deleteKey rune = 127
-var clearLine = "\x1b[K"
-var clearScreen = "\x1b[2J"
-var cursorHome = "\x1b[;H"
-var cursorJump = "\x1b[%d;%dH"
+const enterKey rune = 13
+const deleteKey rune = 127
+const rightKey rune = 65514
+const leftKey rune = 65515
+const downKey rune = 65516
+const upKey rune = 65517
+const bg1 = termbox.ColorBlack
+const fg1 = termbox.ColorWhite
+const bg2 = termbox.ColorGreen
+const fgh = termbox.ColorBlack
+const bgh = termbox.ColorWhite
+const builtInColor = termbox.ColorYellow
+const fnNameColor = termbox.ColorCyan
+const commentColor = termbox.ColorBlue
+const varNameColor = termbox.ColorMagenta
+const keywordColor = termbox.ColorGreen
+const stringColor = termbox.ColorRed
+const symbolColor = termbox.ColorWhite
 
-type editor struct {
-  tree *u.Tree
+type Handler interface {
+  handleEvent([]string) error
+  render()
 }
 
-func panicIfError(err interface{}) {
-  if err != nil {
-    panic(err)
+type App struct {
+  editor Handler
+  miniBuffer string
+  miniBufferPrompt string
+  miniBufferCallback func(string) []string
+  mode string
+}
+
+func NewApp() *App {
+  editor := NewEditor()
+  return &App{
+    editor: editor,
+    miniBuffer: "",
+    miniBufferPrompt: "",
+    miniBufferCallback: nil,
+    mode: "normal",
   }
 }
 
-func readTokenFromStdin () *cu.Token {
-  tokenStr := readInputInMiniBuffer("symbol: ")
-  return cu.NewToken(tokenStr)
-}
-
-
-func newLeafFirst(tree *u.Tree) {
-  token := readTokenFromStdin()
-  tree.InsertSibling(token, -1)
-}
-
-func newParens(tree *u.Tree) {
-  tree.InsertSibling(cu.NewToken("("), -1)
-  err := tree.Left()
-  tree.AppendChild(cu.NewToken(")"))
-  err = tree.DownFirst()
-  panicIfError(err)
-}
-
-func (ed *editor) refresh () {
-  codeStr := cu.UnParseClj(ed.tree)
-  active := ed.tree.Active.Data.(*cu.Token)
-  printNode := fmt.Sprintf("\x1b[15;0H\x1b[K%v", active)
-  cursorJumpStr := fmt.Sprintf(cursorJump, active.Row+1, active.Col+1)
-  fmt.Print(clearScreen, cursorHome, codeStr, printNode, cursorJumpStr)
-  //traverseFn := func (n *u.TreeNode) {
-  //  token := *n.Data.(*cu.Token)
-  //  fmt.Printf("\x1b[15;0H\x1b[K%v\x1b[%d;%dH", token, token.Row, token.Col)
-  //  reader := bufio.NewReader(os.Stdin)
-  //  reader.ReadRune()
-  //}
-  //ed.tree.DepthFirstTraverse(traverseFn)
-}
-
-func (ed *editor) writeFile() {
-  fileName := readInputInMiniBuffer("file: ")
-  data := []byte(cu.UnParseClj(ed.tree))
-  ioutil.WriteFile(fileName, data, 0644)
-}
-
-func printMsg(msg string) {
-  out := fmt.Sprintf(cursorJump, 21, 0)
-  out += clearLine
-  out += msg
-  fmt.Print(out)
-}
-
-func (ed *editor) handleInput(c rune) {
-  var err error
-  switch c {
-  case 'h': err = ed.tree.Left()
-  case 'j': err = ed.tree.DownFirst()
-  case 'k': err = ed.tree.Up()
-  case 'l': err = ed.tree.Right()
-  case 's': newLeafFirst(ed.tree)
-  case 'd': newParens(ed.tree)
-  case 'w': ed.writeFile()
+func (app *App) finishCmdInMiniBuffer(prompt string, partialCmd []string) {
+  app.mode = "miniBuffer"
+  app.miniBuffer = ""
+  app.miniBufferPrompt = prompt
+  app.miniBufferCallback = func(input string) []string {
+    return append(partialCmd, input)
   }
-  if err != nil {
-    panic(err)
-    //printMsg("Fail")
+}
+
+func (app *App) handleEvent(ev termbox.Event) error {
+  var cmd []string
+  var quit bool
+  switch app.mode {
+  case "normal":
+    if ev.Ch != 0 {
+      switch ev.Ch {
+      case 'q': quit = true
+      case 'h': cmd = []string{"buffer", "move", "left"}
+      case 'j': cmd = []string{"buffer", "move", "down"}
+      case 'k': cmd = []string{"buffer", "move", "up"}
+      case 'l': cmd = []string{"buffer", "move", "right"}
+      case 's': app.finishCmdInMiniBuffer("symbol: ", []string{"buffer", "insert", "symbol"})
+      case 'c': cmd = []string{"buffer", "insert", "call"}
+      case 'd': cmd = []string{"buffer", "delete", "symbol"}
+      case 'w': cmd = []string{"buffer", "write"}
+      case 'n': app.finishCmdInMiniBuffer("buffer name: ", []string{"new-buffer"})
+      case 'z': cmd = []string{"kill-buffer"}
+      }
+    } else {
+      if rune(ev.Key) == rightKey {
+        cmd = []string{"next-buffer"}
+      }
+    }
+  case "miniBuffer":
+    if rune(ev.Key) == enterKey {
+      cmd = app.miniBufferCallback(app.miniBuffer)
+      app.mode = "normal"
+      app.miniBuffer = ""
+      app.miniBufferPrompt = ""
+      app.miniBufferCallback = nil
+    } else if rune(ev.Key) == deleteKey {
+      l := len(app.miniBuffer)
+      app.miniBuffer = app.miniBuffer[:l-1]
+    } else {
+      app.miniBuffer += string(ev.Ch)
+    }
   }
+  if cmd != nil {
+    err := app.editor.handleEvent(cmd)
+    panicIfError(err)
+  }
+  if quit {
+    return errors.New("quit")
+  } else {
+    return nil
+  }
+}
+
+func (app *App) render() {
+  termbox.Clear(bg1, bg1)
+  app.editor.render()
+  tbPrint(20, 0, fg1, bg1, app.miniBufferPrompt + app.miniBuffer)
+  termbox.Flush()
 }
 
 func main() {
-  oldState, err := terminal.MakeRaw(0)
-  if err != nil {
-    panic(err)
-  }
-  defer terminal.Restore(0, oldState)
+  err := termbox.Init()
+  defer termbox.Close()
+  panicIfError(err)
 
-  data, _ := ioutil.ReadFile("example.clj")
-  var tree *u.Tree = cu.ParseClj(data)
-  ed := editor{tree}
-  ed.refresh()
+  app := NewApp()
+  app.render()
 
-  reader := bufio.NewReader(os.Stdin)
-  //fmt.Print("\x1b[2J")
-  var c rune
-  for err == nil {
-    c, _, err = reader.ReadRune()
-    if c == 'q' {
+  for {
+    event := termbox.PollEvent()
+    err := app.handleEvent(event)
+    if err != nil {
       break
     } else {
-      ed.handleInput(c)
+      app.render()
     }
-    ed.refresh()
   }
 }
+
