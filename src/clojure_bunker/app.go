@@ -95,6 +95,9 @@ func (app *App) handleEvent(ev termbox.Event) error {
       case 'w':
         app.finishCmdInMiniBuffer(
           "write buffer to: ", []string{"write"})
+      case 'e':
+        app.finishCmdInMiniBuffer(
+          "edit file: ", []string{"load"})
       }
     } else {
       if rune(ev.Key) == rightKey {

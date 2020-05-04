@@ -66,6 +66,18 @@ func (e *Editor) writeActiveBuffer(fname string) {
   panicIfError(err)
 }
 
+func (e *Editor) loadFile(fname string) {
+  data, err := ioutil.ReadFile(fname)
+  panicIfError(err)
+  tree := parseClj(data)
+  tree.Active = tree.Root.Children[0]
+  mapSyntaxTree(tree)
+  b := &Buffer{fname, "normal", tree}
+  b.setCursor(true)
+  e.buffers = append(e.buffers, b)
+  e.active = len(e.buffers) - 1
+}
+
 func (e *Editor) handleEvent (event []string) error {
   e.lastCmd = event
   cmd := event[0]
@@ -75,6 +87,7 @@ func (e *Editor) handleEvent (event []string) error {
   case "kill-buffer": e.killBuffer()
   case "buffer": e.buffers[e.active].handleEvent(event[1:])
   case "write": e.writeActiveBuffer(event[1])
+  case "load": e.loadFile(event[1])
   }
   return nil
 }
