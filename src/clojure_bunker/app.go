@@ -84,22 +84,28 @@ func (app *App) handleEvent(ev termbox.Event) error {
           "symbol: ", []string{"buffer", "insert", "symbol", "before"})
       case 'c': cmd = []string{"buffer", "insert", "call", "after"}
       case 'C': cmd = []string{"buffer", "insert", "call", "before"}
-      case 'd': cmd = []string{"buffer", "delete", "symbol"}
-      case 'w': cmd = []string{"buffer", "write"}
+      case 'v': cmd = []string{"buffer", "insert", "vect", "after"}
+      case 'V': cmd = []string{"buffer", "insert", "vect", "before"}
+      case 'd': cmd = []string{"buffer", "delete"}
       case 'n':
       app.finishCmdInMiniBuffer(
         "buffer name: ", []string{"new-buffer"})
       case 'z': cmd = []string{"kill-buffer"}
       case 'i': cmd = []string{"buffer", "mode", "insert"}
+      case 'w':
+        app.finishCmdInMiniBuffer(
+          "write buffer to: ", []string{"write"})
       }
     } else {
       if rune(ev.Key) == rightKey {
         cmd = []string{"next-buffer"}
-      } else if rune(ev.Key) == 3 {
+      } else if rune(ev.Key) == 3 { // Ctrl + c
         cmd = []string{"buffer", "insert", "call", "below"}
-      } else if rune(ev.Key) == 19 {
+      } else if rune(ev.Key) == 19 { // Ctrl + s
         app.finishCmdInMiniBuffer(
           "insert: ", []string{"buffer", "insert", "symbol", "below"})
+      } else if rune(ev.Key) == 22 { // Ctrl + v
+        cmd = []string{"buffer", "insert", "vect", "below"}
       }
     }
   case "miniBuffer":

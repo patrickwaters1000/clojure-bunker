@@ -1,6 +1,7 @@
 package main
 
 import (
+  "io/ioutil"
 )
 
 type Editor struct {
@@ -40,6 +41,31 @@ func (e *Editor) killBuffer() {
   }
 }
 
+func (e *Editor) writeActiveBuffer(fname string) {
+  var msg string = ""
+  var row int = 0
+  var col int = 0
+  traverseFn := func (n *TreeNode) {
+    token := n.Data.(*Token)
+    if token.Row > row {
+      for i:=0; i<token.Row-row; i++ {
+        msg += "\n"
+        row += 1
+      }
+      col = 0
+    }
+    for j:=0; j<token.Col-col; j++ {
+      msg += " "
+      col += 1
+    }
+    msg += token.Value
+    col += len(token.Value)
+  }
+  e.buffers[e.active].(*Buffer).tree.DepthFirstTraverseNoRoot(traverseFn)
+  err := ioutil.WriteFile(fname, []byte(msg), 0644)
+  panicIfError(err)
+}
+
 func (e *Editor) handleEvent (event []string) error {
   e.lastCmd = event
   cmd := event[0]
@@ -48,6 +74,7 @@ func (e *Editor) handleEvent (event []string) error {
   case "next-buffer": e.nextBuffer()
   case "kill-buffer": e.killBuffer()
   case "buffer": e.buffers[e.active].handleEvent(event[1:])
+  case "write": e.writeActiveBuffer(event[1])
   }
   return nil
 }

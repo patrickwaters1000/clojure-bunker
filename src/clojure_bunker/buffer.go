@@ -176,7 +176,7 @@ func (b *Buffer) setCursor (v bool) {
 func (b *Buffer) moveRight () error {
   err := b.tree.Right()
   token := b.tree.Active.Data.(*Token)
-  if err != nil && token.Class == "close" {
+  if err == nil && token.Class == "close" {
     err = b.tree.Right()
   }
   return err
@@ -185,7 +185,7 @@ func (b *Buffer) moveRight () error {
 func (b *Buffer) moveLeft () error {
   err := b.tree.Left()
   token := b.tree.Active.Data.(*Token)
-  if err != nil && token.Class == "close" {
+  if err == nil && token.Class == "close" {
     err = b.tree.Left()
   }
   return err
@@ -197,6 +197,18 @@ func (b *Buffer) moveDown () error {
     err = b.tree.DownFirst()
   }
   return err
+}
+
+func (b *Buffer) deleteNode () {
+  active := b.tree.Active
+  class := active.Data.(*Token).Class
+  if class != "root" {
+    idx := active.Index
+    err := b.tree.Up()
+    panicIfError(err)
+    err = b.tree.DeleteChild(idx)
+    panicIfError(err)
+  }
 }
 
 
@@ -218,11 +230,7 @@ func (b *Buffer) handleEvent (event []string) error {
     //case "map":
     case "symbol": b.insertSymbol(event[2], event[3])
     }
-  case "delete":
-    switch event[1] {
-    case "symbol":
-    case "group":
-    }
+  case "delete": b.deleteNode()
   }
   panicIfError(err)
   b.setCursor(true)
