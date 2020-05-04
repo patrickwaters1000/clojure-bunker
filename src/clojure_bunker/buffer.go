@@ -7,13 +7,14 @@ import (
 
 type Buffer struct {
   name string
+  mode string
   tree *Tree
 }
 
 func NewBuffer (name string) *Buffer {
   token := NewToken("root", "")
   tree := NewTree(token)
-  return &Buffer{name, tree}
+  return &Buffer{name, "normal", tree}
 }
 
 func logTree (t *Tree) {
@@ -39,6 +40,7 @@ func isBuiltIn(s string) bool {
   }
 }
 
+// Delete this because tree nodes know their Index values
 func getPosition(n *TreeNode) int {
   for i, m := range n.Parent.Children {
     if m == n {
@@ -50,8 +52,8 @@ func getPosition(n *TreeNode) int {
 
 func getColor (n *TreeNode) termbox.Attribute {
   t := n.Data.(*Token)
-  position := getPosition(n)
-  if t.Class == "open" || t.Class == "closed" {
+  position := n.Index
+  if t.Class == "open" || t.Class == "close" {
     return symbolColor
   } else if position == 0 {
     if isBuiltIn(t.Value) {
@@ -89,22 +91,75 @@ func (b Buffer) render () {
   b.tree.DepthFirstTraverseNoRoot(traverseFn)
 }
 
-func (b *Buffer) insertCall () {
-  b.tree.AppendChild(NewToken("open", "("))
-  err := b.tree.DownFirst()
-  panicIfError(err)
-  b.tree.AppendChild(NewToken("close", ")"))
-  err = b.tree.DownFirst()
-  panicIfError(err)
+func (b *Buffer) insertCall (position string) {
+  class := b.tree.Active.Data.(*Token).Class
+  allowed := or(
+    position != "below",
+    class == "open" || class == "root")
+  if allowed {
+    var err error
+    switch position {
+    case "below":
+      b.tree.InsertChild(NewToken("open", "("), 0)
+      err = b.tree.DownFirst()
+    case "before":
+      b.tree.InsertSibling(NewToken("open", "("), -1)
+      err = b.tree.Left()
+    case "after":
+      b.tree.InsertSibling(NewToken("open", "("), 0)
+      err = b.tree.Right()
+    }
+    panicIfError(err)
+    b.tree.AppendChild(NewToken("close", ")"))
+    panicIfError(err)
+  }
 }
 
-func (b *Buffer) insertVect () {
-  b.tree.InsertSibling(NewToken("open", "["), -1)
-  err := b.tree.Left()
-  panicIfError(err)
-  b.tree.AppendChild(NewToken("close", "]"))
-  err = b.tree.DownFirst()
-  panicIfError(err)
+func (b *Buffer) insertVect (position string) {
+  class := b.tree.Active.Data.(*Token).Class
+  allowed := or(
+    position != "below",
+    class == "open" || class == "root")
+  if allowed {
+    var err error
+    switch position {
+    case "below":
+      b.tree.InsertChild(NewToken("open", "["), 0)
+      err = b.tree.DownFirst()
+    case "before":
+      b.tree.InsertSibling(NewToken("open", "["), -1)
+      err = b.tree.Left()
+    case "after":
+      b.tree.InsertSibling(NewToken("open", "["), 0)
+      err = b.tree.Right()
+    }
+    panicIfError(err)
+    b.tree.AppendChild(NewToken("close", "]"))
+    panicIfError(err)
+  }
+}
+
+func (b *Buffer) insertSymbol (position, symbol string) {
+  class := b.tree.Active.Data.(*Token).Class
+  allowed := or(
+    position != "below",
+    class == "open" || class == "root")
+  if allowed {
+    token := NewToken("symbol", symbol)
+    var err error
+    switch position {
+    case "below":
+      b.tree.InsertChild(token, 0)
+      err = b.tree.DownFirst()
+    case "before":
+      b.tree.InsertSibling(token, -1)
+      err = b.tree.Left()
+    case "after":
+      b.tree.InsertSibling(token, 0)
+      err = b.tree.Right()
+    }
+    panicIfError(err)
+  }
 }
 
 func (b *Buffer) setCursor (v bool) {
@@ -121,7 +176,7 @@ func (b *Buffer) setCursor (v bool) {
 func (b *Buffer) moveRight () error {
   err := b.tree.Right()
   token := b.tree.Active.Data.(*Token)
-  if err != nil && token.Class == "closed" {
+  if err != nil && token.Class == "close" {
     err = b.tree.Right()
   }
   return err
@@ -130,11 +185,20 @@ func (b *Buffer) moveRight () error {
 func (b *Buffer) moveLeft () error {
   err := b.tree.Left()
   token := b.tree.Active.Data.(*Token)
-  if err != nil && token.Class == "closed" {
+  if err != nil && token.Class == "close" {
     err = b.tree.Left()
   }
   return err
 }
+
+func (b *Buffer) moveDown () error {
+  var err error
+  if len(b.tree.Active.Children) > 1 {
+    err = b.tree.DownFirst()
+  }
+  return err
+}
+
 
 func (b *Buffer) handleEvent (event []string) error {
   var err error
@@ -145,16 +209,14 @@ func (b *Buffer) handleEvent (event []string) error {
     case "left":  err = b.moveLeft()
     case "right": err = b.moveRight()
     case "up":    err = b.tree.Up()
-    case "down":  err = b.tree.DownFirst()
+    case "down":  err = b.moveDown()
     }
   case "insert":
     switch event[1] {
-    case "call":   b.insertCall()
-    case "vect":   b.insertVect()
+    case "call":   b.insertCall(event[2])
+    case "vect":   b.insertVect(event[2])
     //case "map":
-    case "symbol":
-      token := NewToken("symbol", event[2])
-      b.tree.InsertSibling(token, -1)
+    case "symbol": b.insertSymbol(event[2], event[3])
     }
   case "delete":
     switch event[1] {
