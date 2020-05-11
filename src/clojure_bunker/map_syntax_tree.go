@@ -63,6 +63,12 @@ func newLineRequired (n *TreeNode) bool {
   )
 }
 
+func doubleNewLineRequired (n *TreeNode) bool {
+  return and(
+    n.Parent.Data.(*Token).Class == "root",
+    n.Index > 0)
+}
+
 func getRow(n *TreeNode, previousToken *Token) int {
   if previousToken == nil || n.Parent == nil {
     return 0
@@ -71,7 +77,9 @@ func getRow(n *TreeNode, previousToken *Token) int {
   if previousRow == -1 {
     panic("Previous token's row hasn't been set")
   }
-  if newLineRequired(n) {
+  if doubleNewLineRequired(n) {
+    return previousRow + 2
+  } else if newLineRequired(n) {
     return previousRow + 1
   } else {
     return previousRow
@@ -81,8 +89,9 @@ func getRow(n *TreeNode, previousToken *Token) int {
 func getCol(n *TreeNode, previousToken *Token) int {
   if previousToken == nil || n.Parent == nil {
     return 0
-  }
-  if newLineRequired(n) {
+  } else if n.Parent.Data.(*Token).Class == "root" {
+    return 0
+  } else if newLineRequired(n) || doubleNewLineRequired(n) {
     parentToken := n.Parent.Data.(*Token)
     parentCol := parentToken.Col
     if parentCol == -1 {

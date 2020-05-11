@@ -3,6 +3,9 @@ package main
 import (
   "io/ioutil"
   termbox "github.com/nsf/termbox-go"
+  "syscall"
+  "os"
+  "unsafe"
 )
 
 
@@ -45,3 +48,24 @@ func log (msg string) {
   err := ioutil.WriteFile("log", []byte(msg), 0644)
   panicIfError(err)
 }
+
+type winsize struct {
+  rows uint16
+  cols uint16
+  xpixels uint16
+  ypixels uint16
+}
+
+func get_winsize() (int, int) {
+  out, _ := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
+  var size winsize
+  _, _, _ = syscall.Syscall(
+    syscall.SYS_IOCTL,
+    out.Fd(),
+    uintptr(syscall.TIOCGWINSZ),
+    uintptr(unsafe.Pointer(&size)))
+  _ = out.Close()
+  return int(size.rows), int(size.cols)
+}
+
+

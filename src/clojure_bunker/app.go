@@ -1,15 +1,8 @@
 package main
 
 import (
-  //"bufio"
-  //"fmt"
-  //"os"
-  //"unicode"
   "errors"
   termbox "github.com/nsf/termbox-go"
-  //u "utils"
-  //cu "clj_utils"
-  //"io/ioutil"
 )
 
 const enterKey rune = 13
@@ -31,37 +24,64 @@ const keywordColor = termbox.ColorGreen
 const stringColor = termbox.ColorRed
 const symbolColor = termbox.ColorWhite
 
+type Window struct {
+  rows int
+  cols int
+  pos_r int
+  pos_c int
+  screen_r int
+  screen_c int
+}
+
+func (w Window) Print (row, col int, fg, bg termbox.Attribute, msg string) {
+  r := row - w.pos_r
+  c := col - w.pos_c
+  if and(0 <= r,
+         0 <= c,
+         r < w.rows,
+         c < w.cols) {
+    tbPrint(r + w.screen_r, c + w.screen_c, fg, bg, msg)
+  }
+}
+
 type Handler interface {
   handleEvent([]string) error
-  render()
+  render(Window)
+}
+
+type MiniBuffer struct {
+  data string
+  prompt string
+  callback func(string) []string
 }
 
 type App struct {
   editor Handler
-  miniBuffer string
-  miniBufferPrompt string
-  miniBufferCallback func(string) []string
+  editorWindow Window
+  miniBuffer MiniBuffer
+  miniBufferWindow Window
   mode string
 }
 
 func NewApp() *App {
   editor := NewEditor()
+  miniBuffer := MiniBuffer{"" ,"", nil}
+  rows, cols := get_winsize()
   return &App{
     editor: editor,
-    miniBuffer: "",
-    miniBufferPrompt: "",
-    miniBufferCallback: nil,
+    editorWindow: Window{rows-5, cols, 0, 0, 0, 0},
+    miniBuffer: miniBuffer,
+    miniBufferWindow: Window{5, cols, 0, 0, rows-5, 0},
     mode: "normal",
   }
 }
 
 func (app *App) finishCmdInMiniBuffer(prompt string, partialCmd []string) {
   app.mode = "miniBuffer"
-  app.miniBuffer = ""
-  app.miniBufferPrompt = prompt
-  app.miniBufferCallback = func(input string) []string {
+  callback := func(input string) []string {
     return append(partialCmd, input)
   }
+  app.miniBuffer = MiniBuffer{"", prompt, callback}
 }
 
 func (app *App) handleEvent(ev termbox.Event) error {
@@ -72,6 +92,10 @@ func (app *App) handleEvent(ev termbox.Event) error {
     if ev.Ch != 0 {
       switch ev.Ch {
       case 'q': quit = true
+      case 'r':
+        app.finishCmdInMiniBuffer(
+          "port: ", []string{"repl", "connect"})
+      case 't': cmd = []string{"repl", "eval"}
       case 'h': cmd = []string{"buffer", "move", "left"}
       case 'j': cmd = []string{"buffer", "move", "down"}
       case 'k': cmd = []string{"buffer", "move", "up"}
@@ -113,16 +137,14 @@ func (app *App) handleEvent(ev termbox.Event) error {
     }
   case "miniBuffer":
     if rune(ev.Key) == enterKey {
-      cmd = app.miniBufferCallback(app.miniBuffer)
+      cmd = app.miniBuffer.callback(app.miniBuffer.data)
       app.mode = "normal"
-      app.miniBuffer = ""
-      app.miniBufferPrompt = ""
-      app.miniBufferCallback = nil
+      app.miniBuffer = MiniBuffer{"", "", nil}
     } else if rune(ev.Key) == deleteKey {
-      l := len(app.miniBuffer)
-      app.miniBuffer = app.miniBuffer[:l-1]
+      l := len(app.miniBuffer.data)
+      app.miniBuffer.data = app.miniBuffer.data[:l-1]
     } else {
-      app.miniBuffer += string(ev.Ch)
+      app.miniBuffer.data += string(ev.Ch)
     }
   }
   if cmd != nil {
@@ -136,10 +158,15 @@ func (app *App) handleEvent(ev termbox.Event) error {
   }
 }
 
+func (m MiniBuffer) render(w Window) {
+  w.Print(0, 0, fg1, bg1, m.prompt + m.data)
+}
+
 func (app *App) render() {
   termbox.Clear(bg1, bg1)
-  app.editor.render()
-  tbPrint(20, 0, fg1, bg1, app.miniBufferPrompt + app.miniBuffer)
+  app.editor.render(app.editorWindow)
+  app.miniBuffer.render(app.miniBufferWindow)
+  //tbPrint(21, 0, fg1, bg1, fmt.Sprintf("Rows:%d, Cols:%d", app.height, app.width))
   termbox.Flush()
 }
 
@@ -149,7 +176,7 @@ func main() {
   panicIfError(err)
 
   app := NewApp()
-  app.render()
+  //app.render()
 
   for {
     event := termbox.PollEvent()

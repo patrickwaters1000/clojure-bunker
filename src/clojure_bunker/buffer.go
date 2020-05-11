@@ -21,7 +21,8 @@ func logTree (t *Tree) {
   msg := ""
   traverseFn := func (n *TreeNode) {
     d := n.Data.(*Token)
-    msg += fmt.Sprintf("%s %s %d\n", d.Class, d.Value, len(n.Children))
+    msg += fmt.Sprintf("class:%s value:%s children:%d row:%d col:%d\n",
+      d.Class, d.Value, len(n.Children), d.Row, d.Col)
   }
   t.DepthFirstTraverse(traverseFn)
   log(msg)
@@ -73,8 +74,8 @@ func getColor (n *TreeNode) termbox.Attribute {
   }
 }
 
-func (b Buffer) render () {
-  tbPrint(0, 0, fg1, bg1, b.name)
+func (b Buffer) render (w Window) {
+  w.Print(0, 0, fg1, bg1, b.name)
   logTree(b.tree)
   traverseFn := func (node *TreeNode) {
     var bg, fg termbox.Attribute
@@ -86,7 +87,7 @@ func (b Buffer) render () {
       bg = bg1
     }
     token := node.Data.(*Token)
-    tbPrint(token.Row + 2, token.Col, fg, bg, token.Value)
+    w.Print(token.Row + 2, token.Col, fg, bg, token.Value)
   }
   b.tree.DepthFirstTraverseNoRoot(traverseFn)
 }

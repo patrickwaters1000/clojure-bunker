@@ -154,8 +154,9 @@ func (t *Tree) DepthFirstTraverse (f func (*TreeNode)) {
 func (t *Tree) DepthFirstTraverseNoRoot (f func (*TreeNode)) {
   var s = NewStack()
   var n *TreeNode
-  for _,c := range(t.Root.Children) {
-    s.Push(c)
+  l := len(t.Root.Children)
+  for i:=l-1; i>=0; i-- {
+    s.Push(t.Root.Children[i])
   }
   for !s.Empty() {
     n = (s.Pop()).(*TreeNode)
