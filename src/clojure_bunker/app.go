@@ -115,7 +115,9 @@ func (app *App) handleEvent(ev termbox.Event) error {
       app.finishCmdInMiniBuffer(
         "buffer name: ", []string{"new-buffer"})
       case 'z': cmd = []string{"kill-buffer"}
-      case 'i': cmd = []string{"buffer", "mode", "insert"}
+      case 'i':
+        app.mode = "insert"
+        cmd = []string{"buffer", "mode", "insert"}
       case 'w':
         app.finishCmdInMiniBuffer(
           "write buffer to: ", []string{"write"})
@@ -134,6 +136,14 @@ func (app *App) handleEvent(ev termbox.Event) error {
       } else if rune(ev.Key) == 22 { // Ctrl + v
         cmd = []string{"buffer", "insert", "vect", "below"}
       }
+    }
+  case "insert":
+    switch ev.Ch {
+    case 'q': quit = true
+    case 'h': cmd = []string{"buffer", "swap", "left"}
+    case 'j': cmd = []string{"buffer", "swap", "down"}
+    case 'k': cmd = []string{"buffer", "swap", "up"}
+    case 'l': cmd = []string{"buffer", "swap", "right"}
     }
   case "miniBuffer":
     if rune(ev.Key) == enterKey {

@@ -4,13 +4,6 @@ import (
   "errors"
 )
 
-type TreeNode struct {
-  Data interface{}
-  Index int
-  Parent *TreeNode
-  Children []*TreeNode
-}
-
 type Tree struct {
   Root *TreeNode
   Active *TreeNode
@@ -31,21 +24,6 @@ func (t *Tree) AppendChild (d interface{}) error {
     a.Children = append(a.Children, c)
     return nil
   }
-}
-
-func (n *TreeNode) InsertChild (d interface{}, i int) error {
-  if i > len(n.Children) {
-    return errors.New("Insertion index is too large")
-  }
-  newCs := []*TreeNode{}
-  newCs = append(newCs, n.Children[:i]...)
-  newCs = append(newCs, &TreeNode{d, i, n, []*TreeNode{}})
-  for _,c := range n.Children[i:] {
-    c.Index++
-    newCs = append(newCs, c)
-  }
-  n.Children = newCs
-  return nil
 }
 
 // Should define get fns that do error handling
@@ -73,20 +51,8 @@ func (t *Tree) InsertSibling (d interface{}, i int) error {
   return err
 }
 
-// We should NOT be manually reindexing the child nodes!
-
 func (t *Tree) DeleteChild (i int) error {
-  var a = t.Active
-  if i >= len(a.Children) {
-    return errors.New("Child doesn't exist")
-  }
-  var cs = a.Children[i+1:]
-  a.Children = a.Children[:i]
-  for j, c := range cs {
-    c.Index = i + j
-    a.Children = append(a.Children, c)
-  }
-  return nil
+  return t.Active.DeleteChild(i)
 }
 
 func (t *Tree) DownFirst () error {
@@ -134,6 +100,29 @@ func (t *Tree) Right () error {
   var numChildren = len(a.Parent.Children)
   var newIndex = (a.Index + 1) % numChildren
   t.Active = t.Active.Parent.Children[newIndex]
+  return nil
+}
+
+func (t *Tree) Swap (move func(*TreeNode) (*TreeNode, error)) error {
+  n1 := t.Active
+  n2, err := move(n1)
+  if err != nil { return err }
+  if n1.Parent == nil {
+      return errors.New("Current node has no parent")
+  } else if n2.Parent == nil {
+    return errors.New("Target node has no parent")
+  }
+  p1 := n1.Parent
+  p2 := n2.Parent
+  i1 := n1.Index
+  i2 := n2.Index
+  err = p1.DeleteChild(i1)
+  if err != nil { return err }
+  err = p2.InsertChild(n1.Data, i2)
+  if err != nil { return err }
+  t.Active = p2.Children[i2]
+  p1.IndexChildren()
+  p2.IndexChildren()
   return nil
 }
 

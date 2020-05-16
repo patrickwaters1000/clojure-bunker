@@ -2,6 +2,7 @@ package main
 
 import (
   "fmt"
+  //"errors"
   termbox "github.com/nsf/termbox-go"
 )
 
@@ -212,6 +213,51 @@ func (b *Buffer) deleteNode () {
   }
 }
 
+func (b *Buffer) modeInsert () {
+  token := NewToken("cursor", " ")
+  err := b.tree.InsertSibling(token, 0)
+  panicIfError(err)
+  err = b.tree.Right()
+  panicIfError(err)
+}
+
+func (b *Buffer) SwapUp() error {
+  move := func (n *TreeNode) (*TreeNode, error) {
+    return n.Up()
+  }
+  err := b.tree.Swap(move)
+  return err
+}
+
+func (b *Buffer) SwapDown() error {
+  move := func (n *TreeNode) (*TreeNode, error) {
+    r, err := n.RightNotLast()
+    if err != nil { return nil, err }
+    fc, err := r.DownFirst()
+    if err != nil { return nil, err }
+    return fc, nil
+  }
+  err := b.tree.Swap(move)
+  return err
+}
+
+func (b *Buffer) SwapLeft() error {
+  move := func (n *TreeNode) (*TreeNode, error) {
+    n2, err := n.LeftNotLast()
+    return n2, err
+  }
+  err := b.tree.Swap(move)
+  return err
+}
+
+func (b *Buffer) SwapRight() error {
+  move := func (n *TreeNode) (*TreeNode, error) {
+    n2, err := n.RightNotLast()
+    return n2, err
+  }
+  err := b.tree.Swap(move)
+  return err
+}
 
 func (b *Buffer) handleEvent (event []string) error {
   var err error
@@ -224,6 +270,13 @@ func (b *Buffer) handleEvent (event []string) error {
     case "up":    err = b.tree.Up()
     case "down":  err = b.moveDown()
     }
+  case "swap":
+    switch event[1] {
+      case "left": err = b.SwapLeft()
+      case "right": err = b.SwapRight()
+      case "up": err = b.SwapUp()
+      case "down": err = b.SwapDown()
+    }
   case "insert":
     switch event[1] {
     case "call":   b.insertCall(event[2])
@@ -232,6 +285,11 @@ func (b *Buffer) handleEvent (event []string) error {
     case "symbol": b.insertSymbol(event[2], event[3])
     }
   case "delete": b.deleteNode()
+  case "mode":
+    switch event[1] {
+    case "insert": b.modeInsert()
+    //case "normal": b.modeNormal()
+    }
   }
   panicIfError(err)
   b.setCursor(true)
