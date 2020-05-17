@@ -3,7 +3,7 @@ package main
 // Returns whether a space should be rendered before the node's token.
 func spaceRequired (n *TreeNode) bool {
   token := n.Data.(*Token)
-  return n.Index > 0 && !token.IsClosed()
+  return n.GetIndex() > 0 && !token.IsClosed()
 }
 
 // Returns the token of a node's oldest sibling
@@ -21,7 +21,7 @@ func newLineRequiredForDefn (n *TreeNode) bool {
   leader := getLeader(n)
   needNewLine := and(
     leader == "defn",
-    n.Index > 2,
+    n.GetIndex() > 2,
     !n.Data.(*Token).IsClosed(),
   )
   return needNewLine
@@ -34,7 +34,7 @@ func newLineRequiredForLet (n *TreeNode) bool {
   leader := getLeader(n)
   return and(
     leader == "let",
-    n.Index > 1,
+    n.GetIndex() > 1,
     !n.Data.(*Token).IsClosed(),
   )
 }
@@ -45,11 +45,12 @@ func newLineRequiredForLetBinding (n *TreeNode) bool {
   }
   parent := n.Parent.Data.(*Token).Value
   parentLeader := getLeader(n.Parent)
+  i := n.GetIndex()
   return and(
     parentLeader == "let",
     parent == "[",
-    n.Index != 0,
-    n.Index % 2 == 0,
+    i != 0,
+    i % 2 == 0,
     !n.Data.(*Token).IsClosed(),
   )
 }
@@ -66,7 +67,7 @@ func newLineRequired (n *TreeNode) bool {
 func doubleNewLineRequired (n *TreeNode) bool {
   return and(
     n.Parent.Data.(*Token).Class == "root",
-    n.Index > 0)
+    n.GetIndex() > 0)
 }
 
 func getRow(n *TreeNode, previousToken *Token) int {

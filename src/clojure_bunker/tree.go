@@ -10,20 +10,18 @@ type Tree struct {
 }
 
 func NewTree (d interface{}) *Tree {
-  var root = &TreeNode{d, 0, nil, []*TreeNode{}}
+  var root = NewTreeNode(d)
   return &Tree{root, root}
 }
 
 func (t *Tree) AppendChild (d interface{}) error {
   a := t.Active
   if a == nil {
-    return errors.New("Active node can't be `nil`")
-  } else {
-    i := len(a.Children)
-    c := &TreeNode{d, i, a, []*TreeNode{}}
-    a.Children = append(a.Children, c)
-    return nil
+    return errors.New("Active node is `nil`")
   }
+  c := NewTreeNode(d)
+  a.AppendChild(c)
+  return nil
 }
 
 // Should define get fns that do error handling
@@ -47,7 +45,8 @@ func (t *Tree) InsertSibling (d interface{}, i int) error {
   if p == nil {
     return errors.New("Active node has no parent")
   }
-  err := p.InsertChild(d, a.Index + i + 1)
+  idx := a.GetIndex()
+  err := p.InsertChild(d, idx + i + 1)
   return err
 }
 
@@ -81,26 +80,23 @@ func (t *Tree) Up () error {
   return nil
 }
 
-func (t *Tree) Left () error {
-  var a = t.Active
+func (t *Tree) Cycle(d int) error {
+  a := t.Active
   if a == t.Root {
     return errors.New("Root node has no siblings")
   }
-  var numChildren = len(a.Parent.Children)
-  var newIndex = (a.Index + numChildren - 1) % numChildren
-  t.Active = t.Active.Parent.Children[newIndex]
+  nCs := len(a.Parent.Children)
+  i := mod(a.GetIndex() + d, nCs)
+  t.Active = a.Parent.Children[i]
   return nil
 }
 
+func (t *Tree) Left () error {
+  return t.Cycle(-1)
+}
+
 func (t *Tree) Right () error {
-  var a = t.Active
-  if a == t.Root {
-    return errors.New("Root node has no siblings")
-  }
-  var numChildren = len(a.Parent.Children)
-  var newIndex = (a.Index + 1) % numChildren
-  t.Active = t.Active.Parent.Children[newIndex]
-  return nil
+  return t.Cycle(1)
 }
 
 func (t *Tree) Swap (move func(*TreeNode) (*TreeNode, error)) error {
@@ -114,15 +110,13 @@ func (t *Tree) Swap (move func(*TreeNode) (*TreeNode, error)) error {
   }
   p1 := n1.Parent
   p2 := n2.Parent
-  i1 := n1.Index
-  i2 := n2.Index
+  i1 := n1.GetIndex()
+  i2 := n2.GetIndex()
   err = p1.DeleteChild(i1)
   if err != nil { return err }
   err = p2.InsertChild(n1.Data, i2)
   if err != nil { return err }
   t.Active = p2.Children[i2]
-  p1.IndexChildren()
-  p2.IndexChildren()
   return nil
 }
 

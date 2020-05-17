@@ -6,22 +6,32 @@ import (
 
 type TreeNode struct {
   Data interface{}
-  Index int // Deprecated
   Parent *TreeNode
   Children []*TreeNode
 }
 
-func (n *TreeNode) GetIndex () (int, error) {
+func NewTreeNode (d interface{}) *TreeNode {
+  return &TreeNode{d, nil, []*TreeNode{}}
+}
+
+func (n *TreeNode) GetIndex () int {
   p := n.Parent
   if p == nil {
-    return 0, errors.New("Node has no parent")
+    return 0
   }
   for i,c := range p.Children {
     if c == n {
-      return i, nil
+      return i
     }
   }
   panic("Something is wrong")
+}
+
+func (n *TreeNode) GetSiblings () []*TreeNode {
+  if n.Parent == nil {
+    return []*TreeNode{n}
+  }
+  return n.Parent.Children
 }
 
 func (n *TreeNode) Up () (*TreeNode, error) {
@@ -46,41 +56,30 @@ func (n *TreeNode) DownLast () (*TreeNode, error) {
   return n.Children[nCs-1], nil
 }
 
-func (n *TreeNode) Cycle (d int) (*TreeNode, error) {
-  p, err := n.Up()
-  if err != nil { return nil, err }
-  i1, err := n.GetIndex()
-  if err != nil { return nil, err }
-  nCs := len(p.Children)
-  i2 := mod(i1+d, nCs)
-  return p.Children[i2], nil
+func (n *TreeNode) Cycle (d int) *TreeNode {
+  cs := n.GetSiblings()
+  i := mod(n.GetIndex() + d, len(cs))
+  return cs[i]
 }
 
-func (n *TreeNode) Left () (*TreeNode, error) {
+func (n *TreeNode) Left () *TreeNode {
   return n.Cycle(-1)
 }
 
-func (n *TreeNode) Right () (*TreeNode, error) {
+func (n *TreeNode) Right () *TreeNode {
   return n.Cycle(1)
 }
 
 func (n *TreeNode) CycleNotLast (d int) (*TreeNode, error) {
-  p, err := n.Up()
-  if err != nil { return nil, err }
-  nCs := len(p.Children)
+  nCs := len(n.GetSiblings())
   if nCs == 1 {
     return nil, errors.New("Only one child")
   }
-  var r *TreeNode
-  r, err = n.Cycle(d)
-  if err != nil { return nil, err }
-  var i int
-  i, err = r.GetIndex()
-  if err != nil { return nil, err }
-  if i == nCs-1 {
-    r, err = r.Cycle(d)
+  r := n.Cycle(d)
+  if r.GetIndex() == nCs-1 {
+    r = r.Cycle(d)
   }
-  return r,err
+  return r, nil
 }
 
 func (n *TreeNode) LeftNotLast () (*TreeNode, error) {
@@ -91,15 +90,19 @@ func (n *TreeNode) RightNotLast () (*TreeNode, error) {
   return n.CycleNotLast(1)
 }
 
+func (n *TreeNode) AppendChild (c *TreeNode) {
+  n.Children = append(n.Children, c)
+  c.Parent = n
+}
+
 func (n *TreeNode) InsertChild (d interface{}, i int) error {
   if i > len(n.Children) {
     return errors.New("Insertion index is too large")
   }
   newCs := []*TreeNode{}
   newCs = append(newCs, n.Children[:i]...)
-  newCs = append(newCs, &TreeNode{d, i, n, []*TreeNode{}})
+  newCs = append(newCs, &TreeNode{d, n, []*TreeNode{}})
   for _,c := range n.Children[i:] {
-    c.Index++
     newCs = append(newCs, c)
   }
   n.Children = newCs
@@ -114,18 +117,9 @@ func (n *TreeNode) DeleteChild (i int) error {
   }
   var cs = n.Children[i+1:]
   n.Children = n.Children[:i]
-  for j, c := range cs {
-    c.Index = i + j
+  for _, c := range cs {
     n.Children = append(n.Children, c)
   }
   return nil
-}
-
-// TODO call this fn instead of manually changing indices
-// Better TODO remove Index attribute
-func (n *TreeNode) IndexChildren () {
-  for i,c := range n.Children {
-    c.Index = i
-  }
 }
 

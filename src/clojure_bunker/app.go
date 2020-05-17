@@ -138,12 +138,23 @@ func (app *App) handleEvent(ev termbox.Event) error {
       }
     }
   case "insert":
-    switch ev.Ch {
-    case 'q': quit = true
-    case 'h': cmd = []string{"buffer", "swap", "left"}
-    case 'j': cmd = []string{"buffer", "swap", "down"}
-    case 'k': cmd = []string{"buffer", "swap", "up"}
-    case 'l': cmd = []string{"buffer", "swap", "right"}
+    if ev.Key != 0 {
+      switch ev.Key {
+      case termbox.KeyCtrlQ: quit = true
+      case termbox.KeyCtrlH: cmd = []string{"buffer", "swap", "left"}
+      case termbox.KeyCtrlJ: cmd = []string{"buffer", "swap", "down"}
+      case termbox.KeyCtrlK: cmd = []string{"buffer", "swap", "up"}
+      case termbox.KeyCtrlL: cmd = []string{"buffer", "swap", "right"}
+      case termbox.KeySpace: cmd = []string{"buffer", "append", "token"}
+      case 127: cmd = []string{"buffer", "append", "backspace"}
+      case termbox.KeyCtrlC: cmd = []string{"buffer", "append", "open", "call"}
+      case termbox.KeyCtrlV: cmd = []string{"buffer", "append", "open", "vect"}
+      }
+    } else {
+      switch ev.Ch {
+      case ' ': cmd = []string{"buffer", "append", "token"}
+      default: cmd = []string{"buffer", "append", "string", string(ev.Ch)}
+      }
     }
   case "miniBuffer":
     if rune(ev.Key) == enterKey {
