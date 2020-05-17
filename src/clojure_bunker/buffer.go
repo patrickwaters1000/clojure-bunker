@@ -217,11 +217,35 @@ func (b *Buffer) deleteNode () {
 }
 
 func (b *Buffer) modeInsert () {
+  a := b.tree.Active
   token := NewToken("cursor", " ")
-  err := b.tree.InsertChild(token, 0)
+  if a == b.tree.Root {
+    err := b.tree.InsertChild(token, 0)
+    panicIfError(err)
+    err = b.tree.DownFirst()
+    panicIfError(err)
+  } else {
+    err := b.tree.InsertSibling(token, -1)
+    panicIfError(err)
+    err = b.tree.Left()
+    panicIfError(err)
+  }
+}
+
+func (b *Buffer) modeNotInsert () {
+  a := b.tree.Active
+  cs := a.GetSiblings()
+  if len(cs) == 1 { panic("Something is wrong") }
+  i := a.GetIndex()
+  p := a.Parent
+  if p == nil { panic("Something is wrong") }
+  err := p.DeleteChild(i)
   panicIfError(err)
-  err = b.tree.DownFirst()
-  panicIfError(err)
+  if len(cs) == 2 { // Active node and close token
+    b.tree.Active = p
+  } else {
+    b.tree.Active = p.Children[i]
+  }
 }
 
 func (b *Buffer) SwapUp() error {
@@ -349,6 +373,7 @@ func (b *Buffer) handleEvent (event []string) error {
   case "mode":
     switch event[1] {
     case "insert": b.modeInsert()
+    case "not-insert": b.modeNotInsert()
     //case "normal": b.modeNormal()
     }
   }
