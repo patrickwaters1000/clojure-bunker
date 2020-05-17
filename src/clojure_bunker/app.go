@@ -141,6 +141,7 @@ func (app *App) handleEvent(ev termbox.Event) error {
     if ev.Key != 0 {
       switch ev.Key {
       case termbox.KeyCtrlQ: quit = true
+      case termbox.KeyEsc: cmd = []string{"buffer", "mode", "not-insert"}
       case termbox.KeyCtrlH: cmd = []string{"buffer", "swap", "left"}
       case termbox.KeyCtrlJ: cmd = []string{"buffer", "swap", "down"}
       case termbox.KeyCtrlK: cmd = []string{"buffer", "swap", "up"}
