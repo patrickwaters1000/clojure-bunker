@@ -7,7 +7,11 @@ go run \
   tokens.go \
   parse_clj.go \
   map_syntax_tree.go \
+  minibuffer.go \
+  msgbuffer.go \
   buffer.go \
+  repl.go \
   nrepl_client.go \
+  window.go \
   editor.go \
   app.go

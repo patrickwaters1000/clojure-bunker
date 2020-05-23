@@ -1,96 +1,145 @@
 package main
 
 import (
+  termbox "github.com/nsf/termbox-go"
   "io/ioutil"
   "strings"
 )
 
 type Editor struct {
-  buffers []Handler
-  lastCmd []string
-  active int
+  windows []*Window
+  activeWindow int
+  buffers []Buffer
   replClient *Client
-  replBuffer *ReplBuffer
 }
 
 func NewEditor() *Editor {
+  rows, cols := get_winsize()
+  w_full := NewWindow(rows, cols)
+  w_left, w_right := w_full.SplitVertically(cols / 2)
+  w_right_top, w_right_bottom := w_right.SplitHorizontally(rows / 2)
+  miniBuffer := NewMiniBuffer()
+  msgBuffer := NewMsgBuffer()
+  w_right_top.buffer = miniBuffer
+  w_right_bottom.buffer = msgBuffer
   return &Editor{
-    buffers: []Handler{},
-    active: 0,
-    lastCmd: []string{},
-    replClient: NewClient(),
-    replBuffer: nil,
+    windows: []*Window{w_left, w_right_top, w_right_bottom},
+    activeWindow: 0,
+    buffers: []Buffer{miniBuffer, msgBuffer},
+    replClient: nil,
   }
 }
 
-type ReplBuffer struct {
-  text string
+func (e *Editor) getActiveWindow () *Window {
+  return e.windows[e.activeWindow]
 }
 
-func (b ReplBuffer) render (w Window) {
-  lines := strings.Split(b.text, "\n")
-  for i, line := range lines {
-    w.Print(i, 0, fg1, bg1, line)
+func (e *Editor) getActiveBuffer () Buffer {
+  return e.getActiveWindow().buffer
+}
+
+func (e *Editor) getMiniBuffer () *MiniBuffer {
+  for _, b := range e.buffers {
+    switch b.(type) {
+    case *MiniBuffer: return b.(*MiniBuffer)
+    }
   }
+  panic("Not found")
 }
 
-func (b *ReplBuffer) handleEvent (event []string) error {
-  // Add movement commands, etc. here.
+func (e *Editor) getMsgBuffer () *MsgBuffer {
+  for _, b := range e.buffers {
+    switch b.(type) {
+    case *MsgBuffer: return b.(*MsgBuffer)
+    }
+  }
+  panic("Not found")
+}
+
+func (e *Editor) getReplBuffer () *ReplBuffer {
+  for _, b := range e.buffers {
+    switch b.(type) {
+    case *ReplBuffer: return b.(*ReplBuffer)
+    }
+  }
+  panic("Not found")
+}
+
+func (e Editor) logState () {
+  var s []string
+  for _,b := range e.buffers {
+    s = append(s, b.stringify())
+  }
+  joined := strings.Join(s,"\n")
+  ioutil.WriteFile("state", []byte(joined), 0644)
+}
+
+func (e *Editor) handle (event []string) error {
+  e.getMsgBuffer().handle(event)
+  cmd := event[0]
+  switch cmd {
+  case "buffer": e.getActiveBuffer().handle(event[1:])
+  case "minibuffer": e.getMiniBuffer().handle(event[1:])
+  // case "window": e.getActiveWindow().handle(event[1:])
+  case "new-buffer": e.newBuffer(event[1])
+  case "next-buffer": e.nextBuffer()
+  case "kill-buffer": e.killBuffer()
+  case "write-file": e.writeActiveBuffer(event[1])
+  case "load-file": e.loadFile(event[1])
+  case "set-mode": e.getActiveBuffer().handle(event)
+  case "repl":
+    switch event[1] {
+    case "eval": e.replEval()
+    case "connect": e.replConnect(event[2])
+    }
+  default: panic("Not found")
+  }
   return nil
 }
 
+func (e *Editor) render() {
+  termbox.Clear(bg1, bg1)
+  for _, w := range e.windows {
+    b := w.buffer
+    if b != nil {
+      b.render(*w)
+    }
+  }
+  termbox.Flush()
+}
+
 func (editor *Editor) newBuffer(name string) {
-  b := NewBuffer(name)
+  b := NewCodeBuffer()
+  b.name = name
   editor.buffers = append(editor.buffers, b)
-  editor.active = len(editor.buffers) - 1
+  editor.getActiveWindow().buffer = b
+}
+
+func (e *Editor) getActiveBufferIndex () int {
+  activeBuffer := e.getActiveBuffer()
+  for i, b := range e.buffers {
+    if b == activeBuffer {
+      return i
+    }
+  }
+  panic("Not found")
 }
 
 func (e *Editor) nextBuffer() {
   n := len(e.buffers)
-  e.active = mod(e.active + 1, n)
+  i1 := e.getActiveBufferIndex()
+  i2 := mod(i1 + 1, n)
+  e.getActiveWindow().buffer = e.buffers[i2]
 }
 
 func (e *Editor) killBuffer() {
-  e.buffers = append(
-    e.buffers[:e.active],
-    e.buffers[e.active+1:]...)
-  n := len(e.buffers)
-  if n > 0 {
-    e.active = mod(e.active, n)
-  } else {
-    e.active = 0
-  }
-}
-
-func stringifySubtree (n *TreeNode) string {
-  token := NewToken("root","")
-  subtree := NewTree(token)
-  subtree.Root.Children = []*TreeNode{n}
-  var msg string = ""
-  var row int = 0
-  var col int = 0
-  traverseFn := func (n *TreeNode) {
-    token := n.Data.(*Token)
-    if token.Row > row {
-      for i:=0; i<token.Row-row; i++ {
-        msg += "\n"
-        row += 1
-      }
-      col = 0
-    }
-    for j:=0; j<token.Col-col; j++ {
-      msg += " "
-      col += 1
-    }
-    msg += token.Value
-    col += len(token.Value)
-  }
-  subtree.DepthFirstTraverseNoRoot(traverseFn)
-  return msg
+  i := e.getActiveBufferIndex()
+  e.buffers = append(e.buffers[:i], e.buffers[i+1:]...)
+  e.getActiveWindow().buffer = nil
 }
 
 func (e *Editor) writeActiveBuffer(fname string) {
-  msg := stringifySubtree(e.buffers[e.active].(*Buffer).tree.Root)
+  msg := stringifySubtree(e.getActiveBuffer().(*CodeBuffer).tree.Root)
   err := ioutil.WriteFile(fname, []byte(msg), 0644)
   panicIfError(err)
 }
@@ -101,52 +150,28 @@ func (e *Editor) loadFile(fname string) {
   tree := parseClj(data)
   tree.Active = tree.Root.Children[0]
   mapSyntaxTree(tree)
-  b := &Buffer{fname, "normal", tree}
+  b := NewCodeBuffer()
+  b.name = fname
+  b.tree = tree
   b.setCursor(true)
   e.buffers = append(e.buffers, b)
-  e.active = len(e.buffers) - 1
+  e.getActiveWindow().buffer = b
 }
 
 func (e *Editor) replConnect(port string) {
   e.replClient.Connect(port)
-  e.replBuffer = &ReplBuffer{""}
-  e.buffers = append(e.buffers, e.replBuffer)
+  replBuffer := NewReplBuffer()
+  e.buffers = append(e.buffers, replBuffer)
 }
 
 func (e *Editor) replEval() {
-  code := stringifySubtree(e.buffers[e.active].(*Buffer).tree.Active)
+  code := stringifySubtree(e.getActiveBuffer().(*CodeBuffer).tree.Active)
   id := e.replClient.nextId
   e.replClient.Send(code)
   go func() {
     text, _ := e.replClient.GetResponse(id)
-    e.replBuffer.text += (text + "\n\n")
+    e.getReplBuffer().text += (text + "\n\n")
   }()
 }
 
-func (e *Editor) handleEvent (event []string) error {
-  e.lastCmd = event
-  cmd := event[0]
-  switch cmd {
-  case "new-buffer": e.newBuffer(event[1])
-  case "next-buffer": e.nextBuffer()
-  case "kill-buffer": e.killBuffer()
-  case "buffer": e.buffers[e.active].handleEvent(event[1:])
-  case "write": e.writeActiveBuffer(event[1])
-  case "load": e.loadFile(event[1])
-  case "repl":
-    switch event[1] {
-    case "eval": e.replEval()
-    case "connect": e.replConnect(event[2])
-    }
-  }
-  return nil
-}
 
-func (e Editor) render(w Window) {
-  for i, s := range e.lastCmd {
-    w.Print(w.rows - 5 + i, 0, fg1, bg1, s)
-  }
-  if len(e.buffers) > 0 {
-    e.buffers[e.active].render(w)
-  }
-}

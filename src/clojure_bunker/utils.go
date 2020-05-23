@@ -8,6 +8,12 @@ import (
   "unsafe"
 )
 
+const bg1 = termbox.ColorBlack
+const fg1 = termbox.ColorWhite
+const bg2 = termbox.ColorGreen
+const fgh = termbox.ColorBlack
+const bgh = termbox.ColorWhite
+
 
 func panicIfError(err interface{}) {
   if err != nil {
@@ -68,4 +74,29 @@ func get_winsize() (int, int) {
   return int(size.rows), int(size.cols)
 }
 
-
+func stringifySubtree (n *TreeNode) string {
+  token := NewToken("root","")
+  subtree := NewTree(token)
+  subtree.Root.Children = []*TreeNode{n}
+  var msg string = ""
+  var row int = 0
+  var col int = 0
+  traverseFn := func (n *TreeNode) {
+    token := n.Data.(*Token)
+    if token.Row > row {
+      for i:=0; i<token.Row-row; i++ {
+        msg += "\n"
+        row += 1
+      }
+      col = 0
+    }
+    for j:=0; j<token.Col-col; j++ {
+      msg += " "
+      col += 1
+    }
+    msg += token.Value
+    col += len(token.Value)
+  }
+  subtree.DepthFirstTraverseNoRoot(traverseFn)
+  return msg
+}

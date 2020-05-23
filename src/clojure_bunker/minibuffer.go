@@ -1,100 +1,36 @@
 package main
 
 import (
-  "bufio"
-  "fmt"
-  "os"
 )
 
-//var enterKey rune = 13
-//var deleteKey rune = 127
-//var clearLine = "\x1b[K"
-//var clearScreen = "\x1b[2J"
-//var cursorHome = "\x1b[;H"
-//var cursorJump = "\x1b[%d;%dH"
-
-//func panicIfError(err interface{}) {
-//  if err != nil {
-//    panic(err)
-//  }
-//}
-
-
-func readFromStdin(
-  stopCond func(rune) bool,
-  handleChar func(rune),
-) {
-  var err error
-  var c rune
-  reader := bufio.NewReader(os.Stdin)
-  for err == nil {
-    c, _, err = reader.ReadRune()
-    if stopCond(c) {
-      break
-    } else {
-      handleChar(c)
-    }
-  }
-  panicIfError(err)
-}
-
-type miniBuffer struct {
-  data []rune
-  pos [2]int
+type MiniBuffer struct {
+  data string
   prompt string
 }
 
-func (m miniBuffer) start() {
-  out := fmt.Sprintf(cursorJump, m.pos[0], m.pos[1])
-  out += clearLine
-  out += m.prompt
-  fmt.Print(out)
+func NewMiniBuffer () *MiniBuffer {
+  return &MiniBuffer{"", ""}
 }
 
-func (m miniBuffer) printToScreen() {
-  out := fmt.Sprintf(cursorJump, m.pos[0], m.pos[1])
-  out += clearLine
-  out += m.prompt
-  for _,c := range(m.data) {
-    out += string(c)
+func (b *MiniBuffer) reset (prompt string) {
+  b.data = ""
+  b.prompt = prompt
+}
+
+func (b *MiniBuffer) handle (cmd []string) {
+  switch cmd[0] {
+  case "delete":
+    l := len(b.data)
+    b.data = b.data[:l-1]
+  case "append":
+    b.data += cmd[1]
   }
-  fmt.Print(out)
 }
 
-func (m *miniBuffer) handleChar (c rune) {
-  if c == deleteKey {
-    m.data = m.data[:len(m.data)-1]
-  } else {
-    m.data = append(m.data, c)
-  }
-  m.printToScreen()
+func (b MiniBuffer) render(w Window) {
+  w.Print(0, 0, fg1, bg1, b.prompt + b.data)
 }
 
-func (m miniBuffer) quit () {
-  out := fmt.Sprintf(cursorJump, m.pos[0], m.pos[1])
-  out += clearLine
-  fmt.Print(out)
-}
-
-func readInputInMiniBuffer(prompt string) string {
-  m := miniBuffer{[]rune{}, [2]int{20,1}, prompt}
-  m.start()
-  readFromStdin(
-    func(c rune) bool {
-      if c == enterKey {
-        return true
-      } else {
-        return false
-      }
-    },
-    func(c rune) {
-      m.handleChar(c)
-    },
-  )
-  v := ""
-  for _,c := range(m.data) {
-    v += string(c)
-  }
-  m.quit()
-  return v
+func (b MiniBuffer) stringify () string {
+  return "miniBuffer: \n" + b.data + b.prompt + "\n\n"
 }

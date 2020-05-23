@@ -4,6 +4,9 @@ import (
   "errors"
 )
 
+// By convention, methods that modify the tree structure are factored
+// through TreeNode methods.  
+
 type Tree struct {
   Root *TreeNode
   Active *TreeNode
@@ -14,17 +17,14 @@ func NewTree (d interface{}) *Tree {
   return &Tree{root, root}
 }
 
-func (t *Tree) AppendChild (d interface{}) error {
+func (t *Tree) AppendChild (d interface{}) {
   a := t.Active
   if a == nil {
-    return errors.New("Active node is `nil`")
+    panic("Can't append child to active node `nil`")
   }
   c := NewTreeNode(d)
   a.AppendChild(c)
-  return nil
 }
-
-// Should define get fns that do error handling
 
 func (t *Tree) InsertChild (d interface{}, i int) error {
   a := t.Active
@@ -35,6 +35,7 @@ func (t *Tree) InsertChild (d interface{}, i int) error {
   return err
 }
 
+// Deprecated because it returns an error
 // Inserts sibling in position relative to active node
 func (t *Tree) InsertSibling (d interface{}, i int) error {
   a := t.Active

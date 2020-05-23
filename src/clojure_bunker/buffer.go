@@ -6,30 +6,47 @@ import (
   termbox "github.com/nsf/termbox-go"
 )
 
-type Buffer struct {
+type Buffer interface {
+  handle([]string)
+  render(Window)
+  stringify() string
+}
+
+type CodeBuffer struct {
   name string
   mode string
   tree *Tree
 }
 
-func NewBuffer (name string) *Buffer {
+func NewCodeBuffer () *CodeBuffer {
   rootToken := NewToken("root", "")
   tree := NewTree(rootToken)
   leafToken := NewToken("leaf", "")
   tree.AppendChild(leafToken)
-  return &Buffer{name, "normal", tree}
+  return &CodeBuffer{"", "normal", tree}
 }
 
-func logTree (t *Tree) {
+func stringifyTree (t *Tree) string {
   msg := ""
   traverseFn := func (n *TreeNode) {
     d := n.Data.(*Token)
     active := n == t.Active
-    msg += fmt.Sprintf("class:%s value:%s children:%d selected:%v active:%v row:%d col:%d\n",
-      d.Class, d.Value, len(n.Children), d.Selected, active, d.Row, d.Col)
+    consistent := n.checkChildParentConsistency()
+    msg += fmt.Sprintf(
+      "class:%s value:%s children:%d consistent:%v selected:%v active:%v row:%d col:%d\n",
+      d.Class, d.Value, len(n.Children), consistent, d.Selected, active, d.Row, d.Col)
   }
   t.DepthFirstTraverse(traverseFn)
-  log(msg)
+  return msg
+}
+
+func logTree (t *Tree) {
+  log(stringifyTree(t))
+}
+
+func (b CodeBuffer) stringify () string {
+  return fmt.Sprintf("CodeBuffer:\nname: %s\nmode: %s\ntree:\n%s",
+    b.name, b.mode, stringifyTree(b.tree)) + "\n\n"
 }
 
 func isBuiltIn(s string) bool {
@@ -45,15 +62,14 @@ func isBuiltIn(s string) bool {
   }
 }
 
-// Delete this because tree nodes know their Index values
-func getPosition(n *TreeNode) int {
-  for i, m := range n.Parent.Children {
-    if m == n {
-      return i
-    }
-  }
-  return 0 // shouldn't happen
-}
+const builtInColor = termbox.ColorYellow
+const fnNameColor = termbox.ColorCyan
+const commentColor = termbox.ColorBlue
+const varNameColor = termbox.ColorMagenta
+const keywordColor = termbox.ColorGreen
+const stringColor = termbox.ColorRed
+const symbolColor = termbox.ColorWhite
+
 
 func getColor (n *TreeNode) termbox.Attribute {
   t := n.Data.(*Token)
@@ -78,7 +94,7 @@ func getColor (n *TreeNode) termbox.Attribute {
   }
 }
 
-func (b Buffer) render (w Window) {
+func (b CodeBuffer) render (w Window) {
   w.Print(0, 0, fg1, bg1, b.name)
   logTree(b.tree)
   traverseFn := func (node *TreeNode) {
@@ -96,78 +112,78 @@ func (b Buffer) render (w Window) {
   b.tree.DepthFirstTraverseNoRoot(traverseFn)
 }
 
-func (b *Buffer) insertCall (position string) {
-  class := b.tree.Active.Data.(*Token).Class
-  allowed := or(
-    position != "below",
-    class == "open" || class == "root")
-  if allowed {
-    var err error
-    switch position {
-    case "below":
-      b.tree.InsertChild(NewToken("open", "("), 0)
-      err = b.tree.DownFirst()
-    case "before":
-      b.tree.InsertSibling(NewToken("open", "("), -1)
-      err = b.tree.Left()
-    case "after":
-      b.tree.InsertSibling(NewToken("open", "("), 0)
-      err = b.tree.Right()
-    }
-    panicIfError(err)
-    b.tree.AppendChild(NewToken("close", ")"))
-    panicIfError(err)
-  }
-}
+//func (b *Buffer) insertCall (position string) {
+//  class := b.tree.Active.Data.(*Token).Class
+//  allowed := or(
+//    position != "below",
+//    class == "open" || class == "root")
+//  if allowed {
+//    var err error
+//    switch position {
+//    case "below":
+//      b.tree.InsertChild(NewToken("open", "("), 0)
+//      err = b.tree.DownFirst()
+//    case "before":
+//      b.tree.InsertSibling(NewToken("open", "("), -1)
+//      err = b.tree.Left()
+//    case "after":
+//      b.tree.InsertSibling(NewToken("open", "("), 0)
+//      err = b.tree.Right()
+//    }
+//    panicIfError(err)
+//    b.tree.AppendChild(NewToken("close", ")"))
+//    panicIfError(err)
+//  }
+//}
+//
+//func (b *Buffer) insertVect (position string) {
+//  class := b.tree.Active.Data.(*Token).Class
+//  allowed := or(
+//    position != "below",
+//    class == "open" || class == "root")
+//  if allowed {
+//    var err error
+//    switch position {
+//    case "below":
+//      b.tree.InsertChild(NewToken("open", "["), 0)
+//      err = b.tree.DownFirst()
+//    case "before":
+//      b.tree.InsertSibling(NewToken("open", "["), -1)
+//      err = b.tree.Left()
+//    case "after":
+//      b.tree.InsertSibling(NewToken("open", "["), 0)
+//      err = b.tree.Right()
+//    }
+//    panicIfError(err)
+//    b.tree.AppendChild(NewToken("close", "]"))
+//    panicIfError(err)
+//  }
+//}
+//
+//func (b *Buffer) insertSymbol (position, symbol string) {
+//  class := b.tree.Active.Data.(*Token).Class
+//  allowed := or(
+//    position != "below",
+//    class == "open" || class == "root")
+//  if allowed {
+//    token := NewToken("symbol", symbol)
+//    var err error
+//    switch position {
+//    case "below":
+//      b.tree.InsertChild(token, 0)
+//      err = b.tree.DownFirst()
+//    case "before":
+//      b.tree.InsertSibling(token, -1)
+//      err = b.tree.Left()
+//    case "after":
+//      b.tree.InsertSibling(token, 0)
+//      err = b.tree.Right()
+//    }
+//    panicIfError(err)
+//  }
+//}
 
-func (b *Buffer) insertVect (position string) {
-  class := b.tree.Active.Data.(*Token).Class
-  allowed := or(
-    position != "below",
-    class == "open" || class == "root")
-  if allowed {
-    var err error
-    switch position {
-    case "below":
-      b.tree.InsertChild(NewToken("open", "["), 0)
-      err = b.tree.DownFirst()
-    case "before":
-      b.tree.InsertSibling(NewToken("open", "["), -1)
-      err = b.tree.Left()
-    case "after":
-      b.tree.InsertSibling(NewToken("open", "["), 0)
-      err = b.tree.Right()
-    }
-    panicIfError(err)
-    b.tree.AppendChild(NewToken("close", "]"))
-    panicIfError(err)
-  }
-}
-
-func (b *Buffer) insertSymbol (position, symbol string) {
-  class := b.tree.Active.Data.(*Token).Class
-  allowed := or(
-    position != "below",
-    class == "open" || class == "root")
-  if allowed {
-    token := NewToken("symbol", symbol)
-    var err error
-    switch position {
-    case "below":
-      b.tree.InsertChild(token, 0)
-      err = b.tree.DownFirst()
-    case "before":
-      b.tree.InsertSibling(token, -1)
-      err = b.tree.Left()
-    case "after":
-      b.tree.InsertSibling(token, 0)
-      err = b.tree.Right()
-    }
-    panicIfError(err)
-  }
-}
-
-func (b *Buffer) setCursor (v bool) {
+func (b *CodeBuffer) setCursor (v bool) {
   a := b.tree.Active
   at := a.Data.(*Token)
   at.Selected = v
@@ -178,7 +194,7 @@ func (b *Buffer) setCursor (v bool) {
   }
 }
 
-func (b *Buffer) moveRight () error {
+func (b *CodeBuffer) moveRight () error {
   err := b.tree.Right()
   token := b.tree.Active.Data.(*Token)
   if err == nil && token.Class == "close" {
@@ -187,7 +203,7 @@ func (b *Buffer) moveRight () error {
   return err
 }
 
-func (b *Buffer) moveLeft () error {
+func (b *CodeBuffer) moveLeft () error {
   err := b.tree.Left()
   token := b.tree.Active.Data.(*Token)
   if err == nil && token.Class == "close" {
@@ -196,7 +212,7 @@ func (b *Buffer) moveLeft () error {
   return err
 }
 
-func (b *Buffer) moveDown () error {
+func (b *CodeBuffer) moveDown () error {
   var err error
   if len(b.tree.Active.Children) > 1 {
     err = b.tree.DownFirst()
@@ -204,7 +220,7 @@ func (b *Buffer) moveDown () error {
   return err
 }
 
-func (b *Buffer) deleteNode () {
+func (b *CodeBuffer) deleteNode () {
   active := b.tree.Active
   class := active.Data.(*Token).Class
   if class != "root" {
@@ -216,7 +232,7 @@ func (b *Buffer) deleteNode () {
   }
 }
 
-func (b *Buffer) modeInsert () {
+func (b *CodeBuffer) modeInsert () {
   a := b.tree.Active
   token := NewToken("cursor", " ")
   if a == b.tree.Root {
@@ -232,7 +248,7 @@ func (b *Buffer) modeInsert () {
   }
 }
 
-func (b *Buffer) modeNotInsert () {
+func (b *CodeBuffer) modeNotInsert () {
   a := b.tree.Active
   cs := a.GetSiblings()
   if len(cs) == 1 { panic("Something is wrong") }
@@ -248,7 +264,7 @@ func (b *Buffer) modeNotInsert () {
   }
 }
 
-func (b *Buffer) SwapUp() error {
+func (b *CodeBuffer) SwapUp() error {
   move := func (n *TreeNode) (*TreeNode, error) {
     return n.Up()
   }
@@ -256,7 +272,7 @@ func (b *Buffer) SwapUp() error {
   return err
 }
 
-func (b *Buffer) SwapDown() error {
+func (b *CodeBuffer) SwapDown() error {
   move := func (n *TreeNode) (*TreeNode, error) {
     r, err := n.RightNotLast()
     if err != nil { return nil, err }
@@ -268,7 +284,7 @@ func (b *Buffer) SwapDown() error {
   return err
 }
 
-func (b *Buffer) SwapLeft() error {
+func (b *CodeBuffer) SwapLeft() error {
   move := func (n *TreeNode) (*TreeNode, error) {
     n2, err := n.LeftNotLast()
     return n2, err
@@ -277,7 +293,7 @@ func (b *Buffer) SwapLeft() error {
   return err
 }
 
-func (b *Buffer) SwapRight() error {
+func (b *CodeBuffer) SwapRight() error {
   move := func (n *TreeNode) (*TreeNode, error) {
     n2, err := n.RightNotLast()
     return n2, err
@@ -286,7 +302,7 @@ func (b *Buffer) SwapRight() error {
   return err
 }
 
-func (b *Buffer) AppendToToken(s string) {
+func (b *CodeBuffer) AppendToToken(s string) {
   t := b.tree.Active.Data.(*Token)
   if t.Value == " " {
     t.Value = ""
@@ -294,7 +310,7 @@ func (b *Buffer) AppendToToken(s string) {
   t.Value += s
 }
 
-func (b *Buffer) BackspaceToken() {
+func (b *CodeBuffer) BackspaceToken() {
   t := b.tree.Active.Data.(*Token)
   l := len(t.Value)
   if l==0 {
@@ -306,7 +322,7 @@ func (b *Buffer) BackspaceToken() {
   }
 }
 
-func (b *Buffer) AppendToken() {
+func (b *CodeBuffer) AppendToken() {
   a := b.tree.Active
   t := a.Data.(*Token)
   t.Class = "symbol"
@@ -315,10 +331,10 @@ func (b *Buffer) AppendToken() {
   a.Data = NewToken("cursor", " ")
 }
 
-func (b *Buffer) AppendOpen(what string) {
+func (b *CodeBuffer) AppendOpen(what string) {
   a := b.tree.Active
-  p, err := a.Up()
-  panicIfError(err)
+  // p, err := a.Up()
+  // panicIfError(err)
   var openToken *Token
   var closeToken *Token
   switch what {
@@ -329,15 +345,17 @@ func (b *Buffer) AppendOpen(what string) {
     openToken = NewToken("open", "[")
     closeToken = NewToken("close", "]")
   }
-  openNode := NewTreeNode(openToken)
+  cursorToken := NewToken("cursor", " ")
+  cursorNode := NewTreeNode(cursorToken)
   closeNode := NewTreeNode(closeToken)
-  openNode.AppendChild(a)
-  openNode.AppendChild(closeNode)
-  i := a.GetIndex()
-  p.Children[i] = openNode
+  a.Data = openToken
+  a.AppendChild(cursorNode)
+  a.AppendChild(closeNode)
+  err := b.tree.DownFirst()
+  panicIfError(err)
 }
 
-func (b *Buffer) handleEvent (event []string) error {
+func (b *CodeBuffer) handle (event []string) {
   var err error
   b.setCursor(false)
   switch event[0] {
@@ -364,13 +382,13 @@ func (b *Buffer) handleEvent (event []string) error {
     }
   case "insert":
     switch event[1] {
-    case "call":   b.insertCall(event[2])
-    case "vect":   b.insertVect(event[2])
+    //case "call":   b.insertCall(event[2])
+    //case "vect":   b.insertVect(event[2])
     //case "map":
-    case "symbol": b.insertSymbol(event[2], event[3])
+    //case "symbol": b.insertSymbol(event[2], event[3])
     }
   case "delete": b.deleteNode()
-  case "mode":
+  case "set-mode":
     switch event[1] {
     case "insert": b.modeInsert()
     case "not-insert": b.modeNotInsert()
@@ -380,5 +398,4 @@ func (b *Buffer) handleEvent (event []string) error {
   panicIfError(err)
   b.setCursor(true)
   mapSyntaxTree(b.tree)
-  return nil
 }

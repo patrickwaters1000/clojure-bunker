@@ -14,6 +14,15 @@ func NewTreeNode (d interface{}) *TreeNode {
   return &TreeNode{d, nil, []*TreeNode{}}
 }
 
+func (n *TreeNode) checkChildParentConsistency () bool {
+  for _,c := range n.Children {
+    if c.Parent != n {
+      return false
+    }
+  }
+  return true
+}
+
 func (n *TreeNode) GetIndex () int {
   p := n.Parent
   if p == nil {
