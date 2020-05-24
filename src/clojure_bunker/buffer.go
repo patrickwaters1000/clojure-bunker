@@ -3,7 +3,7 @@ package main
 import (
   "fmt"
   //"errors"
-  termbox "github.com/nsf/termbox-go"
+  // termbox "github.com/nsf/termbox-go"
 )
 
 type Buffer interface {
@@ -62,126 +62,53 @@ func isBuiltIn(s string) bool {
   }
 }
 
-const builtInColor = termbox.ColorYellow
-const fnNameColor = termbox.ColorCyan
-const commentColor = termbox.ColorBlue
-const varNameColor = termbox.ColorMagenta
-const keywordColor = termbox.ColorGreen
-const stringColor = termbox.ColorRed
-const symbolColor = termbox.ColorWhite
 
 
-func getColor (n *TreeNode) termbox.Attribute {
-  t := n.Data.(*Token)
-  position := n.GetIndex()
-  if t.Class == "open" || t.Class == "close" {
-    return symbolColor
-  } else if position == 0 {
-    if isBuiltIn(t.Value) {
-      return builtInColor
-    } else {
-      return fnNameColor
-    }
-  } else if position == 1 {
-    lt := n.Parent.Children[0].Data.(*Token)
-    switch lt.Value {
-    case "defn": return fnNameColor
-    case "def": return varNameColor
-    default: return symbolColor
-    }
-  } else {
-    return symbolColor
-  }
-}
+// func getColor (n *TreeNode) termbox.Attribute {
+//   t := n.Data.(*Token)
+//   position := n.GetIndex()
+//   if t.Class == "open" || t.Class == "close" {
+//     return symbolColor
+//   } else if position == 0 {
+//     if isBuiltIn(t.Value) {
+//       return builtInColor
+//     } else {
+//       return fnNameColor
+//     }
+//   } else if position == 1 {
+//     lt := n.Parent.Children[0].Data.(*Token)
+//     switch lt.Value {
+//     case "defn": return fnNameColor
+//     case "def": return varNameColor
+//     default: return symbolColor
+//     }
+//   } else {
+//     return symbolColor
+//   }
+// }
+// 
+// func (b CodeBuffer) render (w Window) {
+//   w.Print(0, 0, fg1, bg1, b.name)
+//   logTree(b.tree)
+//   traverseFn := func (node *TreeNode) {
+//     var bg, fg termbox.Attribute
+//     if node.Data.(*Token).Selected {
+//       fg = fgh
+//       bg = bgh
+//     } else {
+//       fg = getColor(node)
+//       bg = bg1
+//     }
+//     token := node.Data.(*Token)
+//     w.Print(token.Row + 2, token.Col, fg, bg, token.Value)
+//   }
+//   b.tree.DepthFirstTraverseNoRoot(traverseFn)
+// }
 
 func (b CodeBuffer) render (w Window) {
-  w.Print(0, 0, fg1, bg1, b.name)
-  logTree(b.tree)
-  traverseFn := func (node *TreeNode) {
-    var bg, fg termbox.Attribute
-    if node.Data.(*Token).Selected {
-      fg = fgh
-      bg = bgh
-    } else {
-      fg = getColor(node)
-      bg = bg1
-    }
-    token := node.Data.(*Token)
-    w.Print(token.Row + 2, token.Col, fg, bg, token.Value)
-  }
-  b.tree.DepthFirstTraverseNoRoot(traverseFn)
+  a := NewArtist(w)
+  a.Root(b.tree.Root)
 }
-
-//func (b *Buffer) insertCall (position string) {
-//  class := b.tree.Active.Data.(*Token).Class
-//  allowed := or(
-//    position != "below",
-//    class == "open" || class == "root")
-//  if allowed {
-//    var err error
-//    switch position {
-//    case "below":
-//      b.tree.InsertChild(NewToken("open", "("), 0)
-//      err = b.tree.DownFirst()
-//    case "before":
-//      b.tree.InsertSibling(NewToken("open", "("), -1)
-//      err = b.tree.Left()
-//    case "after":
-//      b.tree.InsertSibling(NewToken("open", "("), 0)
-//      err = b.tree.Right()
-//    }
-//    panicIfError(err)
-//    b.tree.AppendChild(NewToken("close", ")"))
-//    panicIfError(err)
-//  }
-//}
-//
-//func (b *Buffer) insertVect (position string) {
-//  class := b.tree.Active.Data.(*Token).Class
-//  allowed := or(
-//    position != "below",
-//    class == "open" || class == "root")
-//  if allowed {
-//    var err error
-//    switch position {
-//    case "below":
-//      b.tree.InsertChild(NewToken("open", "["), 0)
-//      err = b.tree.DownFirst()
-//    case "before":
-//      b.tree.InsertSibling(NewToken("open", "["), -1)
-//      err = b.tree.Left()
-//    case "after":
-//      b.tree.InsertSibling(NewToken("open", "["), 0)
-//      err = b.tree.Right()
-//    }
-//    panicIfError(err)
-//    b.tree.AppendChild(NewToken("close", "]"))
-//    panicIfError(err)
-//  }
-//}
-//
-//func (b *Buffer) insertSymbol (position, symbol string) {
-//  class := b.tree.Active.Data.(*Token).Class
-//  allowed := or(
-//    position != "below",
-//    class == "open" || class == "root")
-//  if allowed {
-//    token := NewToken("symbol", symbol)
-//    var err error
-//    switch position {
-//    case "below":
-//      b.tree.InsertChild(token, 0)
-//      err = b.tree.DownFirst()
-//    case "before":
-//      b.tree.InsertSibling(token, -1)
-//      err = b.tree.Left()
-//    case "after":
-//      b.tree.InsertSibling(token, 0)
-//      err = b.tree.Right()
-//    }
-//    panicIfError(err)
-//  }
-//}
 
 func (b *CodeBuffer) setCursor (v bool) {
   a := b.tree.Active

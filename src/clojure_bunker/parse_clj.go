@@ -6,7 +6,7 @@ import (
 
 var openChars = "([{"
 var closedChars = ")]}"
-var spaceChars = " \n"
+var spaceChars = " \t\n"+string(rune(10)) // Getting "fail" token at end of file. Use byte slices instead?
 var specialChars = openChars + closedChars + spaceChars
 
 func getSpace(data []byte) []byte {
@@ -69,6 +69,8 @@ func parseClj(data []byte) *Tree {
     err = handleToken(tree, token)
     panicIfError(err)
   }
+  leafToken := NewToken("leaf", "")
+  tree.AppendChild(leafToken)
   return tree
 }
 
