@@ -3,7 +3,7 @@ package main
 import (
   "fmt"
   //"errors"
-  // termbox "github.com/nsf/termbox-go"
+  termbox "github.com/nsf/termbox-go"
 )
 
 type Buffer interface {
@@ -86,28 +86,23 @@ func isBuiltIn(s string) bool {
 //     return symbolColor
 //   }
 // }
-// 
-// func (b CodeBuffer) render (w Window) {
-//   w.Print(0, 0, fg1, bg1, b.name)
-//   logTree(b.tree)
-//   traverseFn := func (node *TreeNode) {
-//     var bg, fg termbox.Attribute
-//     if node.Data.(*Token).Selected {
-//       fg = fgh
-//       bg = bgh
-//     } else {
-//       fg = getColor(node)
-//       bg = bg1
-//     }
-//     token := node.Data.(*Token)
-//     w.Print(token.Row + 2, token.Col, fg, bg, token.Value)
-//   }
-//   b.tree.DepthFirstTraverseNoRoot(traverseFn)
-// }
 
 func (b CodeBuffer) render (w Window) {
+  w.Print(0, 0, fg1, bg1, b.name)
+  logTree(b.tree)
+  traverseFn := func (n *TreeNode) {
+    t := n.Data.(*Token)
+    bg := termbox.ColorBlack
+    fg := t.Color
+    if t.Selected {
+      bg = fg
+      fg = termbox.ColorBlack
+    }
+    w.Print(t.Row + 2, t.Col, fg, bg, t.Value)
+  }
   a := NewArtist(w)
-  a.Root(b.tree.Root)
+  a.Root(b.tree.Root) // sets the positions and colors of tokens
+  b.tree.DepthFirstTraverseNoRoot(traverseFn)
 }
 
 func (b *CodeBuffer) setCursor (v bool) {
@@ -282,6 +277,15 @@ func (b *CodeBuffer) AppendOpen(what string) {
   panicIfError(err)
 }
 
+func (b *CodeBuffer) toggleStyleAtPoint () {
+  t := b.tree.Active.Parent.Data.(*Token)
+  if t.Style == "" {
+    t.Style = "alt"
+  } else {
+    t.Style = ""
+  }
+}
+
 func (b *CodeBuffer) handle (event []string) {
   var err error
   b.setCursor(false)
@@ -321,8 +325,9 @@ func (b *CodeBuffer) handle (event []string) {
     case "not-insert": b.modeNotInsert()
     //case "normal": b.modeNormal()
     }
+  case "toggle-style": b.toggleStyleAtPoint()
   }
   panicIfError(err)
   b.setCursor(true)
-  mapSyntaxTree(b.tree)
+  //mapSyntaxTree(b.tree)
 }

@@ -46,18 +46,35 @@ func (a *Artist) Print (n *TreeNode, what string) {
   a.col += len(msg)
 }
 
-func (a *Artist) render (n *TreeNode, mode string) {
+func (a *Artist) Draw (n *TreeNode, role string) {
+  t := n.Data.(*Token)
+  t.Row = a.row
+  t.Col = a.col
+  t.Color = getColor(role)
+  a.col += len(t.Value)
+}
+
+func (a *Artist) render (n *TreeNode, role string) {
+  a.Draw(n, role)
+  t := n.Data.(*Token)
   if len(n.Children) == 0 {
-    a.Print(n, mode)
-  } else if n.Data.(*Token).Value == "[" {
-    a.Vect(n)
+    // pass
+  } else if t.Value == "[" {
+    switch t.Style {
+    case "alt": a.Vect(n)
+    default: a.FlatCall(n)
+    }
   } else {
     leader := n.Children[0].Data.(*Token).Value
     switch leader {
     case "let": a.Let(n)
     //case "def": a.Def(n)
     case "defn": a.Defn(n)
-    default: a.Call(n)
+    default:
+      switch t.Style {
+      case "alt": a.FlatCall(n)
+      default: a.Call(n)
+      }
     }
   }
 }
@@ -77,26 +94,51 @@ func (a *Artist) Root (n *TreeNode) {
 
 func (a *Artist) Call (n *TreeNode) {
   b := a.Copy()
-  mode := "paren"
-  b.Print(n, mode)
   nCs := len(n.Children)
   for i, c := range n.Children {
+    role := "normal"
     switch i {
     case 0:
+      a.row = b.row
       a.col = b.col
-      mode = "func-name"
+      role = "func-name"
     case nCs - 1:
+      a.row = b.row
       a.col = b.col
-      mode = "paren"
+      role = "paren"
     case 1:
+      a.row = b.row
       a.col = b.col + 1
-      mode = "normal"
     default:
       a.row = b.row + 1
-      mode = "normal"
     }
     b = a.Copy()
-    b.render(c, mode)
+    b.render(c, role)
+  }
+  a.row = b.row
+  a.col = b.col
+}
+
+func (a *Artist) FlatCall (n *TreeNode) {
+  b := a.Copy()
+  nCs := len(n.Children)
+  for i, c := range n.Children {
+    role := "normal"
+    switch i {
+    case 0:
+      a.row = b.row
+      a.col = b.col
+      role = "func-name"
+    case nCs - 1:
+      a.row = b.row
+      a.col = b.col
+      role = "paren"
+    default:
+      a.row = b.row
+      a.col = b.col + 1
+    }
+    b = a.Copy()
+    b.render(c, role)
   }
   a.row = b.row
   a.col = b.col
@@ -104,98 +146,113 @@ func (a *Artist) Call (n *TreeNode) {
 
 func (a *Artist) Vect (n *TreeNode) {
   b := a.Copy()
-  mode := "paren"
-  b.Print(n, mode)
   nCs := len(n.Children)
   for i, c := range n.Children {
+    role := "normal"
     switch i {
+    case 0:
+      a.row = b.row
+      a.col = b.col
     case nCs - 1:
-      a.col = b.col + 1
-      mode = "paren"
+      a.row = b.row
+      a.col = b.col
+      role = "paren"
     default:
       a.row = b.row + 1
-      mode = "normal"
     }
     b = a.Copy()
-    b.render(c, mode)
+    b.render(c, role)
   }
+  a.row = b.row
+  a.col = b.col
 }
 
 func (a *Artist) Binding (n *TreeNode) {
+  a.Draw(n, "normal")
   b := a.Copy()
-  mode := "paren"
-  b.Print(n, mode)
+  var c0 int
   nCs := len(n.Children)
   for i, c := range n.Children {
+    role := "normal"
     if i == nCs - 1 {
-      a.col = b.col + 1
-      mode = "paren"
+      a.row = b.row
+      a.col = b.col
+      role = "paren"
+    } else if i == 0 {
+      a.row = b.row
+      a.col = b.col
+      c0 = b.col
     } else if mod(i, 2) == 0 {
       a.row = b.row + 1
-      mode = "normal"
+      a.col = c0
     } else {
       a.row = b.row
       a.col = b.col + 1
     }
     b = a.Copy()
-    b.render(c, mode)
+    b.render(c, role)
   }
+  a.row = b.row
+  a.col = b.col
 }
 
 func (a *Artist) Let (n *TreeNode) {
   c0 := a.col
   b := a.Copy()
-  mode := "paren"
-  b.Print(n, mode)
   nCs := len(n.Children)
   for i, c := range n.Children {
+    role := "normal"
     if i == 0 {
       a.col = b.col
-      mode = "built-in"
+      role = "built-in"
     } else if i == 1 {
       a.row = b.row
       a.col = b.col + 1
     } else if i == nCs - 1 {
       a.row = b.row
       a.col = b.col
-      mode = "paren"
+      role = "paren"
     } else {
       a.row = b.row + 1
       a.col = c0 + 2
-      mode = "normal"
     }
     b = a.Copy()
     if i == 1 {
       b.Binding(c)
     } else {
-      b.render(c, mode)
+      b.render(c, role)
     }
   }
+  a.row = b.row
+  a.col = b.col
 }
 
 func (a *Artist) Defn (n *TreeNode) {
   c0 := a.col
   b := a.Copy()
-  mode := "paren"
-  b.Print(n, mode)
   nCs := len(n.Children)
   for i, c := range n.Children {
+    role := "normal"
     if i == 0 {
+      a.row = b.row
       a.col = b.col
-      mode = "built-in"
-    } else if i == 1 {
+      role = "built-in"
+    } else if i == 1 || i == 2 {
+      a.row = b.row
       a.col = b.col + 1
     } else if i == nCs - 1 {
+      a.row = b.row
       a.col = b.col
-      mode = "paren"
+      role = "paren"
     } else {
       a.row = b.row + 1
-      a.col = c0 + 2
-      mode = "normal"
+      a.col = c0 + 1
     }
     b = a.Copy()
-    b.render(c, mode)
+    b.render(c, role)
   }
+  a.row = b.row
+  a.col = b.col
 }
 
 // Returns whether a space should be rendered before the node's token.

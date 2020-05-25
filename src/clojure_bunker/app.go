@@ -28,7 +28,7 @@ func api (mode string, ev termbox.Event) []string {
   case "normal":
     if ev.Ch != 0 {
       switch ev.Ch {
-      case 'q': cmd = []string{"quit"}
+      case 'c': cmd = []string{"center-window"}
       case 'r': cmd = []string{"partial", "repl", "connect"}
       case 't': cmd = []string{"repl", "eval"}
       case 'h': cmd = []string{"buffer", "move", "left"}
@@ -37,10 +37,6 @@ func api (mode string, ev termbox.Event) []string {
       case 'l': cmd = []string{"buffer", "move", "right"}
       case 's': cmd = []string{"partial", "buffer", "insert", "symbol", "after"}
       case 'S': cmd = []string{"partial", "buffer", "insert", "symbol", "before"}
-      case 'c': cmd = []string{"buffer", "insert", "call", "after"}
-      case 'C': cmd = []string{"buffer", "insert", "call", "before"}
-      case 'v': cmd = []string{"buffer", "insert", "vect", "after"}
-      case 'V': cmd = []string{"buffer", "insert", "vect", "before"}
       case 'd': cmd = []string{"buffer", "delete"}
       case 'n': cmd = []string{"partial", "new-buffer"}
       case 'z': cmd = []string{"kill-buffer"}
@@ -50,6 +46,7 @@ func api (mode string, ev termbox.Event) []string {
       }
     } else {
       switch ev.Key {
+      case termbox.KeyCtrlQ: cmd = []string{"quit"}
       case termbox.KeyArrowRight: cmd = []string{"next-buffer"}
       case termbox.KeyCtrlC: cmd = []string{"buffer", "insert", "call", "below"}
       case termbox.KeyCtrlS:
@@ -61,7 +58,7 @@ func api (mode string, ev termbox.Event) []string {
     if ev.Key != 0 {
       switch ev.Key {
       case termbox.KeyCtrlQ:  cmd = []string{"quit"}
-      case termbox.KeyEsc:    cmd = []string{"buffer", "set-mode", "normal"}
+      case termbox.KeyEsc:    cmd = []string{"buffer", "set-mode", "not-insert"}
       case termbox.KeyCtrlH:  cmd = []string{"buffer", "swap", "left"}
       case termbox.KeyCtrlJ:  cmd = []string{"buffer", "swap", "down"}
       case termbox.KeyCtrlK:  cmd = []string{"buffer", "swap", "up"}
@@ -70,6 +67,7 @@ func api (mode string, ev termbox.Event) []string {
       case termbox.KeyDelete: cmd = []string{"buffer", "append", "backspace"}
       case termbox.KeyCtrlC:  cmd = []string{"buffer", "append", "open", "call"}
       case termbox.KeyCtrlV:  cmd = []string{"buffer", "append", "open", "vect"}
+      case termbox.KeyCtrlT:  cmd = []string{"buffer", "toggle-style"}
       }
     } else {
       switch ev.Ch {
@@ -79,6 +77,7 @@ func api (mode string, ev termbox.Event) []string {
     }
   case "minibuffer":
     switch ev.Key {
+    case termbox.KeyCtrlQ: cmd = []string{"quit"}
     case termbox.KeyEnter:  cmd = []string{"finish-partial"}
     case termbox.KeyDelete: cmd = []string{"minibuffer", "delete"}
     default: cmd = []string{"minibuffer", "append", string(ev.Ch)}

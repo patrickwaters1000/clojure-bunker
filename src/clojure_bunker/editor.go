@@ -74,6 +74,12 @@ func (e Editor) logState () {
   ioutil.WriteFile("state", []byte(joined), 0644)
 }
 
+func (e *Editor) CenterWindow () {
+  b := e.getActiveBuffer().(*CodeBuffer)
+  r := b.tree.Active.Data.(*Token).Row
+  e.getActiveWindow().Center(r)
+}
+
 func (e *Editor) handle (event []string) error {
   e.getMsgBuffer().handle(event)
   cmd := event[0]
@@ -87,6 +93,7 @@ func (e *Editor) handle (event []string) error {
   case "write-file": e.writeActiveBuffer(event[1])
   case "load-file": e.loadFile(event[1])
   case "set-mode": e.getActiveBuffer().handle(event)
+  case "center-window": e.CenterWindow()
   case "repl":
     switch event[1] {
     case "eval": e.replEval()

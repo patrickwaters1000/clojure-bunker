@@ -86,3 +86,7 @@ func (w *Window) SplitVertically(col int) (*Window, *Window) {
   }
   return w1, w2
 }
+
+func (w *Window) Center (row int) {
+  w.pos_r = row - w.rows / 2
+}
