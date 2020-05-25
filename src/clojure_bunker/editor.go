@@ -156,7 +156,6 @@ func (e *Editor) loadFile(fname string) {
   panicIfError(err)
   tree := parseClj(data)
   tree.Active = tree.Root.Children[0]
-  mapSyntaxTree(tree)
   b := NewCodeBuffer()
   b.name = fname
   b.tree = tree
