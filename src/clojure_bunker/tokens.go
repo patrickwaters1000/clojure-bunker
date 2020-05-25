@@ -8,6 +8,7 @@ type Token struct {
   Class string
   Value string
   Selected bool
+  NewLine bool
   Row int
   Col int
   Color termbox.Attribute
@@ -19,6 +20,7 @@ func NewToken (class, value string) *Token {
     Class: class,
     Value: value,
     Selected: false,
+    NewLine: false, // used only with custom formatting
     Row: -1,
     Col: -1,
     Color: termbox.ColorWhite,

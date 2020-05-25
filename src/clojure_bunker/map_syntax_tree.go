@@ -4,6 +4,7 @@ import (
   termbox "github.com/nsf/termbox-go"
 )
 
+// TODO: Clean up unused cases
 func getColor (what string) termbox.Attribute {
   switch what {
   case "built-in"  : return termbox.ColorYellow
@@ -14,6 +15,9 @@ func getColor (what string) termbox.Attribute {
   case "string"    : return termbox.ColorRed
   case "symbol"    : return termbox.ColorWhite
   case "paren"     : return termbox.ColorWhite
+  case "open"      : return termbox.ColorWhite
+  case "close"     : return termbox.ColorWhite
+  case "fail"      : return termbox.ColorWhite
   case "normal"    : return termbox.ColorWhite
   default          : panic("Not found")
   }
@@ -50,7 +54,11 @@ func (a *Artist) Draw (n *TreeNode, role string) {
   t := n.Data.(*Token)
   t.Row = a.row
   t.Col = a.col
-  t.Color = getColor(role)
+  if t.Class == "symbol" {
+    t.Color = getColor(role)
+  } else {
+    t.Color = getColor(t.Class)
+  }
   a.col += len(t.Value)
 }
 
@@ -60,21 +68,12 @@ func (a *Artist) render (n *TreeNode, role string) {
   if len(n.Children) == 0 {
     // pass
   } else if t.Value == "[" {
-    switch t.Style {
-    case "alt": a.Vect(n)
-    default: a.FlatCall(n)
-    }
+    a.Vect(n)
   } else {
     leader := n.Children[0].Data.(*Token).Value
     switch leader {
-    case "let": a.Let(n)
-    //case "def": a.Def(n)
-    case "defn": a.Defn(n)
-    default:
-      switch t.Style {
-      case "alt": a.FlatCall(n)
-      default: a.Call(n)
-      }
+    case "let", "def", "defn", "if", "for": a.Let(n)
+    default: a.Call(n)
     }
   }
 }
@@ -93,47 +92,26 @@ func (a *Artist) Root (n *TreeNode) {
 }
 
 func (a *Artist) Call (n *TreeNode) {
-  b := a.Copy()
+  col0 := a.col + 1
+  b := a.Copy() // Note: cannot be moved inside `for`
   nCs := len(n.Children)
   for i, c := range n.Children {
     role := "normal"
-    switch i {
-    case 0:
+    if i == 0 {
       a.row = b.row
       a.col = b.col
       role = "func-name"
-    case nCs - 1:
+    } else if i == nCs - 1 {
       a.row = b.row
       a.col = b.col
       role = "paren"
-    case 1:
-      a.row = b.row
-      a.col = b.col + 1
-    default:
+    } else if c.Data.(*Token).NewLine {
+      a.col = col0
       a.row = b.row + 1
-    }
-    b = a.Copy()
-    b.render(c, role)
-  }
-  a.row = b.row
-  a.col = b.col
-}
-
-func (a *Artist) FlatCall (n *TreeNode) {
-  b := a.Copy()
-  nCs := len(n.Children)
-  for i, c := range n.Children {
-    role := "normal"
-    switch i {
-    case 0:
-      a.row = b.row
-      a.col = b.col
-      role = "func-name"
-    case nCs - 1:
-      a.row = b.row
-      a.col = b.col
-      role = "paren"
-    default:
+    } else {
+      if i == 1 {
+        col0 = b.col + 1
+      }
       a.row = b.row
       a.col = b.col + 1
     }
@@ -145,46 +123,21 @@ func (a *Artist) FlatCall (n *TreeNode) {
 }
 
 func (a *Artist) Vect (n *TreeNode) {
+  col0 := a.col
   b := a.Copy()
   nCs := len(n.Children)
   for i, c := range n.Children {
     role := "normal"
-    switch i {
-    case 0:
+    if i == 0 {
       a.row = b.row
       a.col = b.col
-    case nCs - 1:
-      a.row = b.row
-      a.col = b.col
-      role = "paren"
-    default:
-      a.row = b.row + 1
-    }
-    b = a.Copy()
-    b.render(c, role)
-  }
-  a.row = b.row
-  a.col = b.col
-}
-
-func (a *Artist) Binding (n *TreeNode) {
-  a.Draw(n, "normal")
-  b := a.Copy()
-  var c0 int
-  nCs := len(n.Children)
-  for i, c := range n.Children {
-    role := "normal"
-    if i == nCs - 1 {
+    } else if i == nCs - 1 {
       a.row = b.row
       a.col = b.col
       role = "paren"
-    } else if i == 0 {
-      a.row = b.row
-      a.col = b.col
-      c0 = b.col
-    } else if mod(i, 2) == 0 {
+    } else if c.Data.(*Token).NewLine {
+      a.col = col0
       a.row = b.row + 1
-      a.col = c0
     } else {
       a.row = b.row
       a.col = b.col + 1
@@ -196,39 +149,10 @@ func (a *Artist) Binding (n *TreeNode) {
   a.col = b.col
 }
 
+// Shamefully, this is a copy of `Vect` with the first line changed.
+// TODO: Dry this out!
 func (a *Artist) Let (n *TreeNode) {
-  c0 := a.col
-  b := a.Copy()
-  nCs := len(n.Children)
-  for i, c := range n.Children {
-    role := "normal"
-    if i == 0 {
-      a.col = b.col
-      role = "built-in"
-    } else if i == 1 {
-      a.row = b.row
-      a.col = b.col + 1
-    } else if i == nCs - 1 {
-      a.row = b.row
-      a.col = b.col
-      role = "paren"
-    } else {
-      a.row = b.row + 1
-      a.col = c0 + 2
-    }
-    b = a.Copy()
-    if i == 1 {
-      b.Binding(c)
-    } else {
-      b.render(c, role)
-    }
-  }
-  a.row = b.row
-  a.col = b.col
-}
-
-func (a *Artist) Defn (n *TreeNode) {
-  c0 := a.col
+  col0 := a.col + 1
   b := a.Copy()
   nCs := len(n.Children)
   for i, c := range n.Children {
@@ -237,16 +161,16 @@ func (a *Artist) Defn (n *TreeNode) {
       a.row = b.row
       a.col = b.col
       role = "built-in"
-    } else if i == 1 || i == 2 {
-      a.row = b.row
-      a.col = b.col + 1
     } else if i == nCs - 1 {
       a.row = b.row
       a.col = b.col
       role = "paren"
-    } else {
+    } else if c.Data.(*Token).NewLine {
+      a.col = col0
       a.row = b.row + 1
-      a.col = c0 + 1
+    } else {
+      a.row = b.row
+      a.col = b.col + 1
     }
     b = a.Copy()
     b.render(c, role)
