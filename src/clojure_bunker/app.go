@@ -78,8 +78,10 @@ func api (mode string, ev termbox.Event) []string {
   case "minibuffer":
     switch ev.Key {
     case termbox.KeyCtrlQ: cmd = []string{"quit"}
-    case termbox.KeyEnter:  cmd = []string{"finish-partial"}
-    case termbox.KeyDelete: cmd = []string{"minibuffer", "delete"}
+    case termbox.KeyEsc:   cmd = []string{"abort-partial"}
+    case termbox.KeyEnter: cmd = []string{"finish-partial"}
+    // 127 is backspace, but doesn't match termbox.KeyBackspace
+    case 127: cmd = []string{"minibuffer", "delete"}
     default: cmd = []string{"minibuffer", "append", string(ev.Ch)}
     }
   }
@@ -105,6 +107,9 @@ func (app *App) handle (cmd []string) {
     app.partialCmd = cmd[1:]
     prompt := partialCmdPrompt(cmd[1:])
     app.editor.getMiniBuffer().reset(prompt)
+  case "abort-partial":
+    app.mode = "normal"
+    app.editor.getMiniBuffer().reset("")
   case "finish-partial":
     app.mode = "normal"
     fullCmd := append(app.partialCmd, app.editor.getMiniBuffer().data)
