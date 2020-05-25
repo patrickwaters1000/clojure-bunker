@@ -76,7 +76,7 @@ func (e Editor) logState () {
 
 func (e *Editor) CenterWindow () {
   b := e.getActiveBuffer().(*CodeBuffer)
-  r := b.tree.Active.Data.(*Token).Row
+  r := b.tree.GetActive().Data.(*Token).Row
   e.getActiveWindow().Center(r)
 }
 
@@ -155,7 +155,8 @@ func (e *Editor) loadFile(fname string) {
   data, err := ioutil.ReadFile(fname)
   panicIfError(err)
   tree := parseClj(data)
-  tree.Active = tree.Root.Children[0]
+  tree.Path = []*TreeNode{tree.Root}
+  _ = tree.DownFirst()
   b := NewCodeBuffer()
   b.name = fname
   b.tree = tree
@@ -171,7 +172,9 @@ func (e *Editor) replConnect(port string) {
 }
 
 func (e *Editor) replEval() {
-  code := stringifySubtree(e.getActiveBuffer().(*CodeBuffer).tree.Active)
+  activeBuffer := e.getActiveBuffer().(*CodeBuffer)
+  activeNode := activeBuffer.tree.GetActive()
+  code := stringifySubtree(activeNode)
   id := e.replClient.nextId
   e.replClient.Send(code)
   go func() {

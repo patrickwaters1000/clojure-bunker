@@ -19,7 +19,8 @@ func getColor (what string) termbox.Attribute {
   case "close"     : return termbox.ColorWhite
   case "fail"      : return termbox.ColorWhite
   case "normal"    : return termbox.ColorWhite
-  default          : panic("Not found")
+  case "cursor"    : return termbox.ColorWhite
+  default          : panic("Not found: " + what)
   }
 }
 

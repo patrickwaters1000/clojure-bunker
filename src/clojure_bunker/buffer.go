@@ -30,11 +30,10 @@ func stringifyTree (t *Tree) string {
   msg := ""
   traverseFn := func (n *TreeNode) {
     d := n.Data.(*Token)
-    active := n == t.Active
-    consistent := n.checkChildParentConsistency()
+    active := n == t.GetActive()
     msg += fmt.Sprintf(
-      "class:%s value:%s children:%d consistent:%v selected:%v active:%v row:%d col:%d\n",
-      d.Class, d.Value, len(n.Children), consistent, d.Selected, active, d.Row, d.Col)
+      "class:%s value:%s children:%d selected:%v active:%v row:%d col:%d\n",
+      d.Class, d.Value, len(n.Children), d.Selected, active, d.Row, d.Col)
   }
   t.DepthFirstTraverse(traverseFn)
   return msg
@@ -62,31 +61,6 @@ func isBuiltIn(s string) bool {
   }
 }
 
-
-
-// func getColor (n *TreeNode) termbox.Attribute {
-//   t := n.Data.(*Token)
-//   position := n.GetIndex()
-//   if t.Class == "open" || t.Class == "close" {
-//     return symbolColor
-//   } else if position == 0 {
-//     if isBuiltIn(t.Value) {
-//       return builtInColor
-//     } else {
-//       return fnNameColor
-//     }
-//   } else if position == 1 {
-//     lt := n.Parent.Children[0].Data.(*Token)
-//     switch lt.Value {
-//     case "defn": return fnNameColor
-//     case "def": return varNameColor
-//     default: return symbolColor
-//     }
-//   } else {
-//     return symbolColor
-//   }
-// }
-
 func (b CodeBuffer) render (w Window) {
   w.Print(0, 0, fg1, bg1, b.name)
   logTree(b.tree)
@@ -105,8 +79,9 @@ func (b CodeBuffer) render (w Window) {
   b.tree.DepthFirstTraverseNoRoot(traverseFn)
 }
 
+// TODO refactor to use Tree methods
 func (b *CodeBuffer) setCursor (v bool) {
-  a := b.tree.Active
+  a := b.tree.GetActive()
   at := a.Data.(*Token)
   at.Selected = v
   if a.Data.(*Token).Class == "open" {
@@ -116,46 +91,51 @@ func (b *CodeBuffer) setCursor (v bool) {
   }
 }
 
-func (b *CodeBuffer) moveRight () error {
-  err := b.tree.Right()
-  token := b.tree.Active.Data.(*Token)
-  if err == nil && token.Class == "close" {
-    err = b.tree.Right()
+// Assumes we are in normal mode
+func (b *CodeBuffer) enforceValidPoint (direction rune) {
+  t := b.tree
+  if t.GetActive().Data.(*Token).IsClosed() {
+    i, err := t.GetActiveIndex()
+    panicIfError(err)
+    if i > 0 {
+      switch direction {
+      case 'l': t.Left()
+      case 'r': t.Right()
+      default: panic("Not found")
+      }
+      t.Right()
+    } else {
+      _ = t.Up()
+    }
   }
-  return err
 }
 
-func (b *CodeBuffer) moveLeft () error {
-  err := b.tree.Left()
-  token := b.tree.Active.Data.(*Token)
-  if err == nil && token.Class == "close" {
-    err = b.tree.Left()
-  }
-  return err
+func (b *CodeBuffer) moveRight () {
+  b.tree.Right()
+  b.enforceValidPoint('r')
 }
 
-func (b *CodeBuffer) moveDown () error {
-  var err error
-  if len(b.tree.Active.Children) > 1 {
-    err = b.tree.DownFirst()
+func (b *CodeBuffer) moveLeft () {
+  b.tree.Left()
+  b.enforceValidPoint('l')
+}
+
+func (b *CodeBuffer) moveDown () {
+  if len(b.tree.GetActive().Children) > 1 {
+    _ = b.tree.DownFirst()
   }
-  return err
 }
 
 func (b *CodeBuffer) deleteNode () {
-  active := b.tree.Active
-  class := active.Data.(*Token).Class
-  if class != "root" {
-    idx := active.GetIndex()
-    err := b.tree.Up()
-    panicIfError(err)
-    err = b.tree.DeleteChild(idx)
-    panicIfError(err)
-  }
+  i, err := b.tree.DeleteActive()
+  panicIfError(err)
+  err = b.tree.Down(i)
+  panicIfError(err)
+  b.enforceValidPoint('l')
 }
 
 func (b *CodeBuffer) modeInsert () {
-  a := b.tree.Active
+  a := b.tree.GetActive()
   token := NewToken("cursor", " ")
   if a == b.tree.Root {
     err := b.tree.InsertChild(token, 0)
@@ -165,67 +145,41 @@ func (b *CodeBuffer) modeInsert () {
   } else {
     err := b.tree.InsertSibling(token, -1)
     panicIfError(err)
-    err = b.tree.Left()
-    panicIfError(err)
+    b.tree.Left()
   }
 }
 
 func (b *CodeBuffer) modeNotInsert () {
-  a := b.tree.Active
-  cs := a.GetSiblings()
-  if len(cs) == 1 { panic("Something is wrong") }
-  i := a.GetIndex()
-  p := a.Parent
-  if p == nil { panic("Something is wrong") }
-  err := p.DeleteChild(i)
-  panicIfError(err)
-  if len(cs) == 2 { // Active node and close token
-    b.tree.Active = p
-  } else {
-    b.tree.Active = p.Children[i]
-  }
+  b.deleteNode()
 }
 
 func (b *CodeBuffer) SwapUp() error {
-  move := func (n *TreeNode) (*TreeNode, error) {
-    return n.Up()
-  }
+  move := []rune{'u', 'r'}
   err := b.tree.Swap(move)
   return err
 }
 
+// Fails if cursor is at end of group, but that seems OK
 func (b *CodeBuffer) SwapDown() error {
-  move := func (n *TreeNode) (*TreeNode, error) {
-    r, err := n.RightNotLast()
-    if err != nil { return nil, err }
-    fc, err := r.DownFirst()
-    if err != nil { return nil, err }
-    return fc, nil
-  }
+  move := []rune{'r', 'd'}
   err := b.tree.Swap(move)
   return err
 }
 
 func (b *CodeBuffer) SwapLeft() error {
-  move := func (n *TreeNode) (*TreeNode, error) {
-    n2, err := n.LeftNotLast()
-    return n2, err
-  }
+  move := []rune{'l'}
   err := b.tree.Swap(move)
   return err
 }
 
 func (b *CodeBuffer) SwapRight() error {
-  move := func (n *TreeNode) (*TreeNode, error) {
-    n2, err := n.RightNotLast()
-    return n2, err
-  }
+  move := []rune{'r', 'r'}
   err := b.tree.Swap(move)
   return err
 }
 
 func (b *CodeBuffer) AppendToToken(s string) {
-  t := b.tree.Active.Data.(*Token)
+  t := b.tree.GetActive().Data.(*Token)
   if t.Value == " " {
     t.Value = ""
   }
@@ -233,7 +187,7 @@ func (b *CodeBuffer) AppendToToken(s string) {
 }
 
 func (b *CodeBuffer) BackspaceToken() {
-  t := b.tree.Active.Data.(*Token)
+  t := b.tree.GetActive().Data.(*Token)
   l := len(t.Value)
   if l==0 {
     panic("Something is wrong")
@@ -245,7 +199,7 @@ func (b *CodeBuffer) BackspaceToken() {
 }
 
 func (b *CodeBuffer) AppendToken() {
-  a := b.tree.Active
+  a := b.tree.GetActive()
   t := a.Data.(*Token)
   t.Class = "symbol"
   err := b.tree.InsertSibling(t, -1)
@@ -254,9 +208,7 @@ func (b *CodeBuffer) AppendToken() {
 }
 
 func (b *CodeBuffer) AppendOpen(what string) {
-  a := b.tree.Active
-  // p, err := a.Up()
-  // panicIfError(err)
+  // Construct tokens
   var openToken *Token
   var closeToken *Token
   switch what {
@@ -268,17 +220,21 @@ func (b *CodeBuffer) AppendOpen(what string) {
     closeToken = NewToken("close", "]")
   }
   cursorToken := NewToken("cursor", " ")
-  cursorNode := NewTreeNode(cursorToken)
-  closeNode := NewTreeNode(closeToken)
-  a.Data = openToken
-  a.AppendChild(cursorNode)
-  a.AppendChild(closeNode)
-  err := b.tree.DownFirst()
+  // Insert tokens
+  t := b.tree
+  i, err := t.DeleteActive() // Moves active up
   panicIfError(err)
+  _ = t.InsertChild(openToken, i)
+  _ = t.Down(i)
+  t.AppendChild(cursorToken)
+  t.AppendChild(closeToken)
+  _ = t.DownFirst()
 }
 
 func (b *CodeBuffer) toggleStyleAtPoint () {
-  t := b.tree.Active.Parent.Data.(*Token)
+  p, err := b.tree.GetActiveParent()
+  panicIfError(err)
+  t := p.Data.(*Token)
   if t.Style == "" {
     t.Style = "alt"
   } else {
@@ -292,10 +248,10 @@ func (b *CodeBuffer) handle (event []string) {
   switch event[0] {
   case "move":
     switch event[1] {
-    case "left":  err = b.moveLeft()
-    case "right": err = b.moveRight()
+    case "left":  b.moveLeft()
+    case "right": b.moveRight()
     case "up":    err = b.tree.Up()
-    case "down":  err = b.moveDown()
+    case "down":  b.moveDown()
     }
   case "swap":
     switch event[1] {
