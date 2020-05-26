@@ -93,33 +93,7 @@ func (t *Tree) DeleteActive () (int, error) {
   return i, t.DeleteChild(i)
 }
 
-// Returns a copy of `t` with a mutation applied to the active node
-// Just enough of `t` is deeply copied that a sequence of `UpdateAvtiveNode`
-// operations behave as if we were truly using deep copies.
-func (t *Tree) UpdateActiveNode (updateFn func(*TreeNode)) *Tree {
-  tNew := NewTree(t.Root.Data)
-  l := len(t.Path)
-  aOld := t.GetActive()
-  for i, n := range t.Path[:l - 1] {
-    cPath := t.Path[i + 1]
-    var jCopy int
-    for j, c := range n.Children {
-      if c == cPath {
-        tNew.AppendChild(c.Data)
-        jCopy = j
-        if c == aOld {
-          updateFn(tNew.GetActive().Children[j])
-        }
-      } else {
-        aNew := tNew.GetActive()
-        aNew.Children = append(aNew.Children, c)
-      }
-    }
-    newPathNode := tNew.GetActive().Children[jCopy]
-    tNew.Path = append(tNew.Path, newPathNode)
-  }
-  return tNew
-}
+
 
 func (t *Tree) Down (i int) error {
   cs := t.GetActive().Children

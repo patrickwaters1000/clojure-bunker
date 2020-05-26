@@ -6,6 +6,7 @@ import (
   "syscall"
   "os"
   "unsafe"
+  "fmt"
 )
 
 const bg1 = termbox.ColorBlack
@@ -72,6 +73,24 @@ func get_winsize() (int, int) {
     uintptr(unsafe.Pointer(&size)))
   _ = out.Close()
   return int(size.rows), int(size.cols)
+}
+
+func sprintTree (t *Tree) string {
+  indentStr := ""
+  msg := ""
+  traverseFn := func (n *TreeNode) {
+    t := n.Data.(*Token)
+    msg += "\n" + indentStr
+    msg += fmt.Sprintf("%s,%s", t.Class, t.Value)
+    if t.IsOpen() {
+      indentStr += "  "
+    } else if t.IsClosed() {
+      l := len(indentStr)
+      indentStr = indentStr[:l-2]
+    }
+  }
+  t.DepthFirstTraverse(traverseFn)
+  return msg
 }
 
 func stringifySubtree (n *TreeNode) string {

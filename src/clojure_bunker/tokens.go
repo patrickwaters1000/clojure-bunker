@@ -45,3 +45,16 @@ func (t Token) IsClosed() bool {
   default: return false
   }
 }
+
+func (t *Token) Copy () Copier {
+  return &Token{
+    Class:    t.Class,
+    Value:    t.Value,
+    Selected: t.Selected,
+    NewLine:  t.NewLine,
+    Row:      t.Row,
+    Col:      t.Col,
+    Color:    t.Color,
+    Style:    t.Style,
+  }
+}
