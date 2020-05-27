@@ -36,8 +36,8 @@ func stringifyTree (t *Tree) string {
     d := n.Data.(*Token)
     active := n == t.GetActive()
     msg += fmt.Sprintf(
-      "class:%s value:%s children:%d selected:%v active:%v row:%d col:%d\n",
-      d.Class, d.Value, len(n.Children), d.Selected, active, d.Row, d.Col)
+      "class:%s value:%s children:%d selected:%v active:%v row:%d col:%d style:%s\n",
+      d.Class, d.Value, len(n.Children), d.Selected, active, d.Row, d.Col, d.Style)
   }
   t.DepthFirstTraverse(traverseFn)
   return msg
@@ -297,14 +297,17 @@ func (b *CodeBuffer) AppendOpen(what string) {
 }
 
 func (b *CodeBuffer) toggleStyleAtPoint () {
-  p, err := b.tree.GetActiveParent()
-  panicIfError(err)
-  t := p.Data.(*Token)
-  if t.Style == "" {
-    t.Style = "alt"
-  } else {
-    t.Style = ""
+  tNew := b.tree.PersistentCopy()
+  p := tNew.GetActive()
+  tok := p.Data.(*Token)
+  switch tok.Style {
+  case "long":       tok.Style = ""
+  case "", "custom": tok.Style = "short"
+  case "short":      tok.Style = "binding"
+  case "binding":    tok.Style = "long"
   }
+  b.history = append(b.history, b.tree)
+  b.tree = tNew
 }
 
 

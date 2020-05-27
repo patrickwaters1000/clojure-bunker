@@ -79,9 +79,29 @@ func (a *Artist) Root (n *TreeNode) {
   }
 }
 
+func setNewLines (n *TreeNode, newLineFn func(int) bool) {
+  for i, c := range n.Children {
+    c.Data.(*Token).NewLine = newLineFn(i)
+  }
+}
+
+func applyStyle (n *TreeNode) {
+  switch n.Data.(*Token).Style {
+  case "long":
+    setNewLines(n, func(i int) bool { return i > 1 })
+  case "short":
+    setNewLines(n, func(i int) bool { return false })
+  case "binding":
+    setNewLines(n, func(i int) bool {
+      return mod(i, 2) == 0 && i > 0
+    })
+  }
+}
+
 func (a *Artist) Call (n *TreeNode) {
   col0 := a.col + 1
   b := a.Copy() // Note: cannot be moved inside `for`
+  applyStyle(n)
   nCs := len(n.Children)
   for i, c := range n.Children {
     role := "normal"
@@ -113,6 +133,7 @@ func (a *Artist) Call (n *TreeNode) {
 func (a *Artist) Vect (n *TreeNode) {
   col0 := a.col
   b := a.Copy()
+  applyStyle(n)
   nCs := len(n.Children)
   for i, c := range n.Children {
     role := "normal"
@@ -142,6 +163,7 @@ func (a *Artist) Vect (n *TreeNode) {
 func (a *Artist) Let (n *TreeNode) {
   col0 := a.col + 1
   b := a.Copy()
+  applyStyle(n)
   nCs := len(n.Children)
   for i, c := range n.Children {
     role := "normal"

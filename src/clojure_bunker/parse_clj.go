@@ -120,29 +120,3 @@ func parseClj(data []byte) *Tree {
   return tree
 }
 
-// type Parser struct {
-//   tree Tree
-//   data []byte
-// }
-// 
-// func (p *Parser) TakeToken () {
-// 
-// 
-// func (p *Parser) ParseToken (parent string, leader, string, idx int) {
-//   newLine := p.TakeWhitespace()
-//   t := p.TakeToken()
-//   if newLine {
-//     t.Newline = true
-//   }
-//   if t.IsOpen() {
-//     leader := p.CheckToken() {
-//     case "defn": p.ParseDefn()
-//     case "let": p.ParseLet()
-//     default: p.ParseCall()
-//     }
-//   } else if t.IsClosed() {
-//     p.ParseClose()
-//   } else {
-//     p.tree.AppendChild(t)
-//   }
-// 
