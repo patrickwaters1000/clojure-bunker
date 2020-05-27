@@ -1,3 +1,9 @@
+package main
+
+import (
+  "errors"
+)
+
 type Copier interface {
   Copy() Copier
 }
@@ -42,7 +48,7 @@ func (t *Tree) PersistentMove (move []rune) (*Tree, error) {
   pathCopy := append(
     []*TreeNode{},
     t.Path...)
-  tNew = &Tree{
+  tNew := &Tree{
     Root: t.Root,
     Path: pathCopy,
   }
@@ -75,7 +81,7 @@ func (t *Tree) PersistentInsertSibling (d interface{}, i int) (*Tree, error) {
   for j:=0; j<i; j++ {
     move = append(move, 'r')
   }
-  tNew, err := t.PersistentMove(move)
+  tNew, err = t.PersistentMove(move)
   return tNew, err
 }
 
@@ -97,4 +103,5 @@ func (t *Tree) PersistentDeleteActive () (*Tree, int, error) {
   tNew, err = tNew.PersistentDelete(i)
   return tNew, i, err
 }
+
 

@@ -14,16 +14,20 @@ type Buffer interface {
 
 type CodeBuffer struct {
   name string
-  mode string
-  tree *Tree
+  tree *Tree // By convention, the root node's value holds the buffer's mode
+  history []*Tree
 }
 
 func NewCodeBuffer () *CodeBuffer {
-  rootToken := NewToken("root", "")
+  rootToken := NewToken("root", "normal")
   tree := NewTree(rootToken)
   leafToken := NewToken("leaf", "")
   tree.AppendChild(leafToken)
-  return &CodeBuffer{"", "normal", tree}
+  return &CodeBuffer{
+    name: "",
+    tree: tree,
+    history: []*Tree{},
+  }
 }
 
 func stringifyTree (t *Tree) string {
@@ -44,8 +48,9 @@ func logTree (t *Tree) {
 }
 
 func (b CodeBuffer) stringify () string {
+  mode := b.tree.Root.Data.(*Token).Value
   return fmt.Sprintf("CodeBuffer:\nname: %s\nmode: %s\ntree:\n%s",
-    b.name, b.mode, stringifyTree(b.tree)) + "\n\n"
+    b.name, mode, stringifyTree(b.tree)) + "\n\n"
 }
 
 func isBuiltIn(s string) bool {
@@ -79,6 +84,12 @@ func (b CodeBuffer) render (w Window) {
   b.tree.DepthFirstTraverseNoRoot(traverseFn)
 }
 
+func (b *CodeBuffer) undo () {
+  l := len(b.history)
+  b.tree = b.history[l - 1]
+  b.history = b.history[:l - 1]
+}
+
 // TODO refactor to use Tree methods
 func (b *CodeBuffer) setCursor (v bool) {
   a := b.tree.GetActive()
@@ -92,90 +103,139 @@ func (b *CodeBuffer) setCursor (v bool) {
 }
 
 // Assumes we are in normal mode
+// Should only be used after another movement operation,
+// thus it's unnecessary to use deep copying
 func (b *CodeBuffer) enforceValidPoint (direction rune) {
   t := b.tree
   if t.GetActive().Data.(*Token).IsClosed() {
-    i, err := t.GetActiveIndex()
-    panicIfError(err)
-    if i > 0 {
-      switch direction {
-      case 'l': t.Left()
-      case 'r': t.Right()
-      default: panic("Not found")
-      }
-      t.Right()
-    } else {
-      _ = t.Up()
-    }
+    t.Move([]rune{direction})
   }
 }
 
-func (b *CodeBuffer) moveRight () {
-  b.tree.Right()
+func (b *CodeBuffer) moveRightNormal () {
+  tNew, err := b.tree.PersistentMove([]rune{'r'})
+  panicIfError(err)
+  b.history = append(b.history, b.tree)
+  b.tree = tNew
   b.enforceValidPoint('r')
 }
 
-func (b *CodeBuffer) moveLeft () {
-  b.tree.Left()
+func (b *CodeBuffer) moveLeftNormal () {
+  tNew, err := b.tree.PersistentMove([]rune{'l'})
+  panicIfError(err)
+  b.history = append(b.history, b.tree)
+  b.tree = tNew
   b.enforceValidPoint('l')
 }
 
-func (b *CodeBuffer) moveDown () {
+func (b *CodeBuffer) moveDownNormal () {
   if len(b.tree.GetActive().Children) > 1 {
-    _ = b.tree.DownFirst()
+    tNew, err := b.tree.PersistentMove([]rune{'d'})
+    panicIfError(err)
+    b.history = append(b.history, b.tree)
+    b.tree = tNew
   }
 }
 
+func (b *CodeBuffer) moveUpNormal () {
+  t := b.tree
+  if t.GetActive() != t.Root {
+    tNew, err := t.PersistentMove([]rune{'u'})
+    panicIfError(err)
+    b.history = append(b.history, t)
+    b.tree = tNew
+  }
+}
+
+// Actually only mutates active node's parent
+// totally OK to copy w.r.t. current path
+func (b *CodeBuffer) moveLeftInsert () {
+  t := b.tree
+  i1, _ := t.GetActiveIndex() // Root cannot be active node in insert mode
+  tNew := b.tree.PersistentCopy()
+  p, _ := tNew.GetActiveParent()
+  tempNode := p.Children[i1]
+  i2 := mod(i1 - 1, len(p.Children) - 1)
+  p.Children[i1] = p.Children[i2]
+  p.Children[i2] = tempNode
+  b.history = append(b.history, t)
+  b.tree = tNew
+}
+
+func (b *CodeBuffer) moveRightInsert () {
+  t := b.tree
+  i1, _ := t.GetActiveIndex() // Root cannot be active node in insert mode
+  tNew := b.tree.PersistentCopy()
+  p, _ := tNew.GetActiveParent()
+  tempNode := p.Children[i1]
+  i2 := mod(i1 + 1, len(p.Children) - 1)
+  p.Children[i1] = p.Children[i2]
+  p.Children[i2] = tempNode
+  b.history = append(b.history, t)
+  b.tree = tNew
+}
+
+func (b *CodeBuffer) moveUpInsert () {
+  t := b.tree
+  pOld, err := t.GetActiveParent()
+  panicIfError(err)
+  if pOld != t.Root {
+    tNew := b.tree.PersistentCopy()
+    childIdx, _ := tNew.GetActiveIndex()
+    _ = tNew.Up()
+    p := tNew.GetActive() // Having moved up, this is parent node
+    parentIdx, _ := tNew.GetActiveIndex()
+    g, _ := tNew.GetActiveParent() // Grandparent
+    childToken := p.Children[childIdx].Data
+    _ = p.DeleteChild(childIdx)
+    _ = g.InsertChild(childToken, parentIdx + 1)
+    tNew.Right()
+    b.history = append(b.history, t)
+    b.tree = tNew
+  }
+}
+
+func (b *CodeBuffer) moveDownInsert () {
+  t := b.tree
+  idx, _ := t.GetActiveIndex()
+  data := t.GetActive().Data
+  t.Right() // A bit sloppy here, after an undo, the cursor would incorrectly move
+  if len(t.GetActive().Children) > 0 {
+    tNew := b.tree.PersistentCopy()
+    p, _ := tNew.GetActiveParent()
+    _ = p.DeleteChild(idx)
+    tNew.GetActive().InsertChild(data, 0)
+    b.history = append(b.history, t)
+    b.tree = tNew
+  }
+}
 func (b *CodeBuffer) deleteNode () {
-  i, err := b.tree.DeleteActive()
+  tNew, _, err := b.tree.PersistentDeleteActive()
   panicIfError(err)
-  err = b.tree.Down(i)
-  panicIfError(err)
-  b.enforceValidPoint('l')
+  b.tree = tNew
 }
 
-func (b *CodeBuffer) modeInsert () {
-  a := b.tree.GetActive()
-  token := NewToken("cursor", " ")
-  if a == b.tree.Root {
-    err := b.tree.InsertChild(token, 0)
-    panicIfError(err)
-    err = b.tree.DownFirst()
-    panicIfError(err)
+func (b *CodeBuffer) enterInsertMode () {
+  tNew := b.tree.PersistentCopy()
+  tNew.Root.Data.(*Token).Value = "insert"
+  cursorToken := NewToken("cursor", " ")
+  if tNew.GetActive() == tNew.Root {
+    _ = tNew.InsertChild(cursorToken, 0)
+    _ = tNew.DownFirst()
   } else {
-    err := b.tree.InsertSibling(token, -1)
-    panicIfError(err)
-    b.tree.Left()
+    _ = tNew.InsertSibling(cursorToken, -1)
+    tNew.Left()
   }
+  b.history = append(b.history, b.tree)
+  b.tree = tNew
 }
 
-func (b *CodeBuffer) modeNotInsert () {
-  b.deleteNode()
-}
-
-func (b *CodeBuffer) SwapUp() error {
-  move := []rune{'u', 'r'}
-  err := b.tree.Swap(move)
-  return err
-}
-
-// Fails if cursor is at end of group, but that seems OK
-func (b *CodeBuffer) SwapDown() error {
-  move := []rune{'r', 'd'}
-  err := b.tree.Swap(move)
-  return err
-}
-
-func (b *CodeBuffer) SwapLeft() error {
-  move := []rune{'l'}
-  err := b.tree.Swap(move)
-  return err
-}
-
-func (b *CodeBuffer) SwapRight() error {
-  move := []rune{'r', 'r'}
-  err := b.tree.Swap(move)
-  return err
+func (b *CodeBuffer) exitInsertMode () {
+  tNew, _, err := b.tree.PersistentDeleteActive()
+  panicIfError(err)
+  tNew.Root.Data.(*Token).Value = "normal"
+  b.history = append(b.history, b.tree)
+  b.tree = tNew
 }
 
 func (b *CodeBuffer) AppendToToken(s string) {
@@ -199,12 +259,15 @@ func (b *CodeBuffer) BackspaceToken() {
 }
 
 func (b *CodeBuffer) AppendToken() {
-  a := b.tree.GetActive()
+  tNew := b.tree.PersistentCopy()
+  a := tNew.GetActive()
   t := a.Data.(*Token)
   t.Class = "symbol"
-  err := b.tree.InsertSibling(t, -1)
+  err := tNew.InsertSibling(t, -1)
   panicIfError(err)
   a.Data = NewToken("cursor", " ")
+  b.history = append(b.history, b.tree)
+  b.tree = tNew
 }
 
 func (b *CodeBuffer) AppendOpen(what string) {
@@ -221,14 +284,16 @@ func (b *CodeBuffer) AppendOpen(what string) {
   }
   cursorToken := NewToken("cursor", " ")
   // Insert tokens
-  t := b.tree
-  i, err := t.DeleteActive() // Moves active up
+  tNew := b.tree.PersistentCopy()
+  i, err := tNew.DeleteActive() // Moves active up
   panicIfError(err)
-  _ = t.InsertChild(openToken, i)
-  _ = t.Down(i)
-  t.AppendChild(cursorToken)
-  t.AppendChild(closeToken)
-  _ = t.DownFirst()
+  _ = tNew.InsertChild(openToken, i)
+  _ = tNew.Down(i)
+  tNew.AppendChild(cursorToken)
+  tNew.AppendChild(closeToken)
+  _ = tNew.DownFirst()
+  b.history = append(b.history, b.tree)
+  b.tree = tNew
 }
 
 func (b *CodeBuffer) toggleStyleAtPoint () {
@@ -242,23 +307,25 @@ func (b *CodeBuffer) toggleStyleAtPoint () {
   }
 }
 
+
 func (b *CodeBuffer) handle (event []string) {
   var err error
   b.setCursor(false)
   switch event[0] {
-  case "move":
+  case "undo": b.undo()
+  case "move-normal":
     switch event[1] {
-    case "left":  b.moveLeft()
-    case "right": b.moveRight()
-    case "up":    err = b.tree.Up()
-    case "down":  b.moveDown()
+    case "left":  b.moveLeftNormal()
+    case "right": b.moveRightNormal()
+    case "up":    b.moveUpNormal()
+    case "down":  b.moveDownNormal()
     }
-  case "swap":
+  case "move-insert":
     switch event[1] {
-      case "left": err = b.SwapLeft()
-      case "right": err = b.SwapRight()
-      case "up": err = b.SwapUp()
-      case "down": err = b.SwapDown()
+      case "left":  b.moveLeftInsert()
+      case "right": b.moveRightInsert()
+      case "up":    b.moveUpInsert()
+      case "down":  b.moveDownInsert()
     }
   case "append":
     switch event[1] {
@@ -277,8 +344,8 @@ func (b *CodeBuffer) handle (event []string) {
   case "delete": b.deleteNode()
   case "set-mode":
     switch event[1] {
-    case "insert": b.modeInsert()
-    case "not-insert": b.modeNotInsert()
+    case "insert": b.enterInsertMode()
+    case "not-insert": b.exitInsertMode()
     //case "normal": b.modeNormal()
     }
   case "toggle-style": b.toggleStyleAtPoint()

@@ -38,19 +38,6 @@ func (a Artist) Copy () *Artist {
   return &Artist{a.window, a.row, a.col}
 }
 
-func (a *Artist) Print (n *TreeNode, what string) {
-  t := n.Data.(*Token)
-  bg := termbox.ColorBlack
-  fg := getColor(what)
-  if t.Selected {
-    bg = fg
-    fg = termbox.ColorBlack
-  }
-  msg := n.Data.(*Token).Value
-  a.window.Print(a.row, a.col, fg, bg, msg)
-  a.col += len(msg)
-}
-
 func (a *Artist) Draw (n *TreeNode, role string) {
   t := n.Data.(*Token)
   t.Row = a.row

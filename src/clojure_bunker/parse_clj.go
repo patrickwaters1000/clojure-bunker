@@ -93,7 +93,7 @@ func handleToken(tree *Tree, token *Token) error {
 }
 
 func parseClj(data []byte) *Tree {
-  initToken := NewToken("root","")
+  initToken := NewToken("root","normal")
   var tree = NewTree(initToken)
   var token *Token
   var l int = len(data)

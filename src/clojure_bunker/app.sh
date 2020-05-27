@@ -4,6 +4,7 @@ go run \
   stack.go \
   tree.go \
   tree_node.go \
+  tree_persistent.go \
   tokens.go \
   parse_clj.go \
   map_syntax_tree.go \

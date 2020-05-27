@@ -23,6 +23,9 @@ func panicIfError(err interface{}) {
 }
 
 func mod(n, d int) int {
+  if d == 0 {
+    return 0
+  }
   m := n % d
   if m < 0 {
     m += d
