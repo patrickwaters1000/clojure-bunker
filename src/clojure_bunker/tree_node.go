@@ -47,3 +47,19 @@ func (n *TreeNode) DeleteChild (i int) error {
   return nil
 }
 
+func (r *TreeNode) DepthFirstTraverseNoRoot (f func (*TreeNode)) {
+  var s = NewStack()
+  var n *TreeNode
+  l := len(r.Children)
+  for i:=l-1; i>=0; i-- {
+    s.Push(r.Children[i])
+  }
+  for !s.Empty() {
+    n = (s.Pop()).(*TreeNode)
+    f(n)
+    l := len(n.Children)
+    for i:=l-1; i>=0; i-- {
+      s.Push(n.Children[i])
+    }
+  }
+}

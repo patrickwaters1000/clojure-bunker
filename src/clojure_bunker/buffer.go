@@ -262,7 +262,11 @@ func (b *CodeBuffer) AppendToken() {
   tNew := b.tree.PersistentCopy()
   a := tNew.GetActive()
   t := a.Data.(*Token)
-  t.Class = "symbol"
+  switch t.Value[0] {
+  case '"': t.Class = "string"
+  case ':': t.Class = "keyword"
+  default: t.Class = "symbol"
+  }
   err := tNew.InsertSibling(t, -1)
   panicIfError(err)
   a.Data = NewToken("cursor", " ")
@@ -277,9 +281,11 @@ func (b *CodeBuffer) AppendOpen(what string) {
   switch what {
   case "call":
     openToken = NewToken("open", "(")
+    openToken.Style = "long"
     closeToken = NewToken("close", ")")
   case "vect":
     openToken = NewToken("open", "[")
+    openToken.Style = "short"
     closeToken = NewToken("close", "]")
   }
   cursorToken := NewToken("cursor", " ")

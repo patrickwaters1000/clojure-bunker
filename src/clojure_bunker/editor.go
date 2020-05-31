@@ -166,6 +166,7 @@ func (e *Editor) loadFile(fname string) {
 }
 
 func (e *Editor) replConnect(port string) {
+  e.replClient = NewClient()
   e.replClient.Connect(port)
   replBuffer := NewReplBuffer()
   e.buffers = append(e.buffers, replBuffer)

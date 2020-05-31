@@ -61,7 +61,7 @@ func api (mode string, ev termbox.Event) []string {
       case termbox.KeyCtrlK:  cmd = []string{"buffer", "move-insert", "up"}
       case termbox.KeyCtrlL:  cmd = []string{"buffer", "move-insert", "right"}
       case termbox.KeySpace:  cmd = []string{"buffer", "append", "token"}
-      case termbox.KeyDelete: cmd = []string{"buffer", "append", "backspace"}
+      case 127: cmd = []string{"buffer", "append", "backspace"}
       case termbox.KeyCtrlC:  cmd = []string{"buffer", "append", "open", "call"}
       case termbox.KeyCtrlV:  cmd = []string{"buffer", "append", "open", "vect"}
       }
@@ -93,6 +93,10 @@ func partialCmdPrompt(cmd []string) string {
   case "new-buffer": s = "buffer name: "
   case "write-file": s = "write buffer to: "
   case "load-file":  s = "edit file: "
+  case "repl":
+    switch cmd[1] {
+    case "connect": s = "nrepl port: "
+    }
   default: panic("Not found")
   }
   return s
@@ -143,7 +147,9 @@ func main() {
     event := termbox.PollEvent()
     currentMode := app.getMode()
     cmd := api(currentMode, event)
-    if cmd[0] == "quit" {
+    if len(cmd) == 0 {
+      // key not mapped to command; pass
+    } else if cmd[0] == "quit" {
       break
     } else {
       app.handle(cmd)

@@ -21,7 +21,9 @@ func (b *MiniBuffer) handle (cmd []string) {
   switch cmd[0] {
   case "delete":
     l := len(b.data)
-    b.data = b.data[:l-1]
+    if l > 0 {
+      b.data = b.data[:l-1]
+    }
   case "append":
     b.data += cmd[1]
   }

@@ -97,9 +97,6 @@ func sprintTree (t *Tree) string {
 }
 
 func stringifySubtree (n *TreeNode) string {
-  token := NewToken("root","")
-  subtree := NewTree(token)
-  subtree.Root.Children = []*TreeNode{n}
   var msg string = ""
   var row int = 0
   var col int = 0
@@ -119,6 +116,6 @@ func stringifySubtree (n *TreeNode) string {
     msg += token.Value
     col += len(token.Value)
   }
-  subtree.DepthFirstTraverseNoRoot(traverseFn)
+  n.DepthFirstTraverseNoRoot(traverseFn)
   return msg
 }
