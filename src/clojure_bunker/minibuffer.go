@@ -17,16 +17,18 @@ func (b *MiniBuffer) reset (prompt string) {
   b.prompt = prompt
 }
 
-func (b *MiniBuffer) handle (cmd []string) {
-  switch cmd[0] {
-  case "delete":
-    l := len(b.data)
-    if l > 0 {
-      b.data = b.data[:l-1]
-    }
-  case "append":
-    b.data += cmd[1]
+func (b *MiniBuffer) Delete () {
+  l := len(b.data)
+  if l > 0 {
+    b.data = b.data[:l-1]
   }
+}
+
+func (b *MiniBuffer) Append (s string) {
+  b.data += s
+}
+
+func (b *MiniBuffer) handle (cmd []string) {
 }
 
 func (b MiniBuffer) render(w Window) {

@@ -80,29 +80,7 @@ func (e *Editor) CenterWindow () {
   e.getActiveWindow().Center(r)
 }
 
-func (e *Editor) handle (event []string) error {
-  e.getMsgBuffer().handle(event)
-  cmd := event[0]
-  switch cmd {
-  case "buffer": e.getActiveBuffer().handle(event[1:])
-  case "minibuffer": e.getMiniBuffer().handle(event[1:])
-  // case "window": e.getActiveWindow().handle(event[1:])
-  case "new-buffer": e.newBuffer(event[1])
-  case "next-buffer": e.nextBuffer()
-  case "kill-buffer": e.killBuffer()
-  case "write-file": e.writeActiveBuffer(event[1])
-  case "load-file": e.loadFile(event[1])
-  case "set-mode": e.getActiveBuffer().handle(event)
-  case "center-window": e.CenterWindow()
-  case "repl":
-    switch event[1] {
-    case "eval": e.replEval()
-    case "connect": e.replConnect(event[2])
-    }
-  default: panic("Not found")
-  }
-  return nil
-}
+
 
 func (e *Editor) render() {
   termbox.Clear(bg1, bg1)
@@ -184,4 +162,27 @@ func (e *Editor) replEval() {
   }()
 }
 
+func (e *Editor) nextWindow () {
+  e.activeWindow += 1
+}
 
+func (e *Editor) handle (event []string) {
+  e.getMsgBuffer().handle(event)
+  switch event[0] {
+  case "buffer": e.getActiveBuffer().handle(event[1:])
+  case "new-buffer": e.newBuffer(event[1])
+  case "next-buffer": e.nextBuffer()
+  case "kill-buffer": e.killBuffer()
+  case "write-file": e.writeActiveBuffer(event[1])
+  case "load-file": e.loadFile(event[1])
+  case "set-mode": e.getActiveBuffer().handle(event)
+  case "center-window": e.CenterWindow()
+  case "repl-eval": e.replEval()
+  case "repl-connect": e.replConnect(event[2])
+  case "window":
+    switch event[1] {
+    case "next": e.nextWindow()
+    }
+  default: panic("Not found: " + event[0])
+  }
+}

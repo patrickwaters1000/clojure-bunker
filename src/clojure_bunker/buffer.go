@@ -318,48 +318,26 @@ func (b *CodeBuffer) toggleStyleAtPoint () {
 
 
 func (b *CodeBuffer) handle (event []string) {
-  var err error
   b.setCursor(false)
   switch event[0] {
   case "undo": b.undo()
-  case "move-normal":
-    switch event[1] {
-    case "left":  b.moveLeftNormal()
-    case "right": b.moveRightNormal()
-    case "up":    b.moveUpNormal()
-    case "down":  b.moveDownNormal()
-    }
-  case "move-insert":
-    switch event[1] {
-      case "left":  b.moveLeftInsert()
-      case "right": b.moveRightInsert()
-      case "up":    b.moveUpInsert()
-      case "down":  b.moveDownInsert()
-    }
-  case "append":
-    switch event[1] {
-    case "string": b.AppendToToken(event[2])
-    case "backspace": b.BackspaceToken()
-    case "token": b.AppendToken()
-    case "open": b.AppendOpen(event[2])
-    }
-  case "insert":
-    switch event[1] {
-    //case "call":   b.insertCall(event[2])
-    //case "vect":   b.insertVect(event[2])
-    //case "map":
-    //case "symbol": b.insertSymbol(event[2], event[3])
-    }
-  case "delete": b.deleteNode()
-  case "set-mode":
-    switch event[1] {
-    case "insert": b.enterInsertMode()
-    case "not-insert": b.exitInsertMode()
-    //case "normal": b.modeNormal()
-    }
-  case "toggle-style": b.toggleStyleAtPoint()
+  case "move-normal-left":  b.moveLeftNormal()
+  case "move-normal-right": b.moveRightNormal()
+  case "move-normal-up":    b.moveUpNormal()
+  case "move-normal-down":  b.moveDownNormal()
+  case "move-insert-left":  b.moveLeftInsert()
+  case "move-insert-right": b.moveRightInsert()
+  case "move-insert-up":    b.moveUpInsert()
+  case "move-insert-down":  b.moveDownInsert()
+  case "insert-string":     b.AppendToToken(event[1])
+  case "insert-backspace":  b.BackspaceToken()
+  case "insert-token":      b.AppendToken()
+  case "insert-call":       b.AppendOpen("call")
+  case "insert-vect":       b.AppendOpen("vect")
+  case "delete":            b.deleteNode()
+  case "enter-insert-mode": b.enterInsertMode()
+  case "exit-insert-mode":  b.exitInsertMode()
+  case "toggle-style":      b.toggleStyleAtPoint()
   }
-  panicIfError(err)
   b.setCursor(true)
-  //mapSyntaxTree(b.tree)
 }
