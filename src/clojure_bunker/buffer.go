@@ -14,6 +14,7 @@ type Buffer interface {
 
 type CodeBuffer struct {
   name string
+  file string
   tree *Tree // By convention, the root node's value holds the buffer's mode
   history []*Tree
 }
@@ -25,6 +26,7 @@ func NewCodeBuffer () *CodeBuffer {
   tree.AppendChild(leafToken)
   return &CodeBuffer{
     name: "",
+    file: "",
     tree: tree,
     history: []*Tree{},
   }
@@ -47,23 +49,11 @@ func logTree (t *Tree) {
   log(stringifyTree(t))
 }
 
+// For debugging, not writing to disc
 func (b CodeBuffer) stringify () string {
   mode := b.tree.Root.Data.(*Token).Value
   return fmt.Sprintf("CodeBuffer:\nname: %s\nmode: %s\ntree:\n%s",
     b.name, mode, stringifyTree(b.tree)) + "\n\n"
-}
-
-func isBuiltIn(s string) bool {
-  switch s {
-  case "let":  return true
-  case "def":  return true
-  case "defn": return true
-  case "for":  return true
-  case "and":  return true
-  case "or":   return true
-  case "cond": return true
-  default: return false
-  }
 }
 
 func (b CodeBuffer) render (w Window) {
@@ -204,7 +194,9 @@ func (b *CodeBuffer) moveDownInsert () {
     tNew := b.tree.PersistentCopy()
     p, _ := tNew.GetActiveParent()
     _ = p.DeleteChild(idx)
-    tNew.GetActive().InsertChild(data, 0)
+    a := tNew.GetActive()
+    a.InsertChild(data, 0)
+    tNew.Path = append(tNew.Path, a.Children[0])
     b.history = append(b.history, t)
     b.tree = tNew
   }

@@ -5,6 +5,7 @@ import (
 )
 
 type Window struct {
+  canSelect bool
   rows int
   cols int
   pos_r int // Allows to control what part of the buffer
@@ -27,6 +28,7 @@ func (w Window) Print (row, col int, fg, bg termbox.Attribute, msg string) {
 
 func NewWindow (rows, cols int) *Window {
   return &Window{
+    canSelect: true,
     rows: rows,
     cols: cols,
     pos_r: 0,
@@ -42,6 +44,7 @@ func (w *Window) SplitHorizontally (row int) (*Window, *Window) {
     panic("Something is wrong")
   }
   w1 := &Window{
+    canSelect: true,
     rows: row,
     cols: w.cols,
     pos_r: w.pos_r,
@@ -51,6 +54,7 @@ func (w *Window) SplitHorizontally (row int) (*Window, *Window) {
     buffer: w.buffer,
   }
   w2 := &Window{
+    canSelect: true,
     rows: w.rows - row,
     cols: w.cols,
     pos_r: 0,
@@ -67,6 +71,7 @@ func (w *Window) SplitVertically(col int) (*Window, *Window) {
     panic("Something is wrong")
   }
   w1 := &Window{
+    canSelect: true,
     rows: w.rows,
     cols: col,
     pos_r: w.pos_r,
@@ -76,6 +81,7 @@ func (w *Window) SplitVertically(col int) (*Window, *Window) {
     buffer: w.buffer,
   }
   w2 := &Window{
+    canSelect: true,
     rows: w.rows,
     cols: w.cols - col,
     pos_r: 0,

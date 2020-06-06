@@ -59,6 +59,16 @@ func log (msg string) {
   panicIfError(err)
 }
 
+func appendToFile (file, msg string) {
+  f, err := os.OpenFile(
+    file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+  panicIfError(err)
+  _, err = f.Write([]byte(msg))
+  panicIfError(err)
+  err = f.Close()
+  panicIfError(err)
+}
+
 type winsize struct {
   rows uint16
   cols uint16
@@ -111,8 +121,8 @@ func stringifySubtree (n *TreeNode) string {
     }
     for j:=0; j<token.Col-col; j++ {
       msg += " "
-      col += 1
     }
+    col = token.Col
     msg += token.Value
     col += len(token.Value)
   }

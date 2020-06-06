@@ -11,11 +11,34 @@ type App struct {
   editor *Editor
   inMinibuffer bool
   partialCmd []string
+  externalEventQueue chan termbox.Event
+  internalEventQueue chan []string
 }
 
 func NewApp () *App {
-  ed := NewEditor()
-  return &App{ed, false, nil}
+  externalEventQueue := make(chan termbox.Event)
+  internalEventQueue := make(chan []string)
+  ed := NewEditor( // When something happens in the editor that requires
+    // triggering a command, we have to put that command in the queue. A
+    // callback for this must be supplied when building the editor. This is
+    // really bad, and a compelling reason not to have separate app and
+    // editor objects.
+    func (cmd []string) {
+      internalEventQueue <- cmd
+    },
+  )
+  go func () {
+    for {
+      externalEventQueue <- termbox.PollEvent()
+    }
+  }()
+  return &App{
+    editor: ed,
+    inMinibuffer: false,
+    partialCmd: nil,
+    externalEventQueue: externalEventQueue,
+    internalEventQueue: internalEventQueue,
+  }
 }
 
 // Translating the keyboard input to a command adds lines of code that
@@ -37,7 +60,8 @@ func getNormalCmd (ev termbox.Event) (bool, []string) {
     case 't': return true,  []string{"repl-eval"}
     case 'n': return false, []string{"new-buffer"}
     case 'z': return true,  []string{"kill-buffer"}
-    case 'w': return false, []string{"write-file"}
+    case 'w': return true,  []string{"write-file"}
+    case 'f': return false, []string{"set-file"}
     case 'e': return false, []string{"load-file"}
     }
   } else {
@@ -76,7 +100,7 @@ func getInsertCmd (ev termbox.Event) (bool, []string) {
 func (app *App) getMinibufferCmd (ev termbox.Event) (bool, []string) {
   switch ev.Key {
   case termbox.KeyCtrlQ: return true,  []string{"quit"}
-  case termbox.KeyEsc:   return true,  []string{}
+  case termbox.KeyEsc:   return true,  []string{"abort"}
   case termbox.KeyEnter:
     cmd := app.editor.getMiniBuffer().data
     return true, []string{cmd}
@@ -101,7 +125,7 @@ func getWindowCmd (ev termbox.Event) (bool, []string) {
 
 var minibufferCmdPrompts = map[string]string {
   "new-buffer":   "buffer name: ",
-  "write-file":   "write buffer to: ",
+  "set-file":   "set file for buffer: ",
   "load-file":    "edit file: ",
   "repl-connect": "nrepl port: ",
 }
@@ -151,6 +175,34 @@ func (app *App) enterMiniBufferIfNecessary () {
   }
 }
 
+func (app *App) handleCmd (done bool, cmd []string) bool {
+  if !done {
+    app.partialCmd = append(app.partialCmd, cmd...)
+    app.enterMiniBufferIfNecessary()
+    app.editor.render()
+    return false
+  } else if len(cmd) == 0 {
+    return false
+  } else if cmd[0] == "refresh" {
+    app.editor.render()
+    return false
+  } else if cmd[0] == "abort" {
+    app.exitMinibufferIfNecessary()
+    app.partialCmd = []string{}
+    app.editor.render()
+    return false
+  } else if cmd[0] == "quit" {
+    return true
+  } else {
+    fullCmd := append(app.partialCmd, cmd...)
+    app.editor.handle(fullCmd)
+    app.exitMinibufferIfNecessary()
+    app.partialCmd = []string{}
+    app.editor.render()
+    return false
+  }
+}
+
 func main() {
   err := termbox.Init()
   defer termbox.Close()
@@ -161,22 +213,18 @@ func main() {
 
   for {
     app.editor.logState()
-    ev := termbox.PollEvent()
-    done, cmd := app.getCmd(ev)
-    if !done {
-      app.partialCmd = append(app.partialCmd, cmd...)
-      app.enterMiniBufferIfNecessary()
-      app.editor.render()
-    } else if len(cmd) == 0 {
-      // pass
-    } else if cmd[0] == "quit" {
+    var done bool
+    var cmd []string
+    select {
+    case ev := <-app.externalEventQueue:
+      done, cmd = app.getCmd(ev)
+    case internalCmd := <-app.internalEventQueue:
+      done = true
+      cmd = internalCmd
+    }
+    quit := app.handleCmd(done, cmd)
+    if quit {
       break
-    } else {
-      fullCmd := append(app.partialCmd, cmd...)
-      app.editor.handle(fullCmd)
-      app.exitMinibufferIfNecessary()
-      app.partialCmd = []string{}
-      app.editor.render()
     }
   }
 }

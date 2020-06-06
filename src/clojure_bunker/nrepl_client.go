@@ -264,6 +264,7 @@ func (c *Client) Send (code string) {
       []interface{}{"code", "id", "op"},
       []interface{}{code, c.nextId, "eval"}})
   c.nextId++
+  appendToFile("repl-out-log", "\n"+code+"\n")
   msgBytes := []byte(msg)
   n, err := c.conn.Write(msgBytes)
   if err != nil {
@@ -279,6 +280,7 @@ func (c *Client) Send (code string) {
 
 func (c *Client) Receive () {
   msg := readBEncode(c.in).(*Dict)
+  appendToFile("repl-in-log", "\n" + pprints(msg, "\n") + "\n")
   id, hasId := msg.get("id")
   idInt := id.(int)
   if hasId {

@@ -5,7 +5,7 @@ import (
 )
 
 type MsgBuffer struct {
-  textRows []string
+  text []string
 }
 
 func NewMsgBuffer () *MsgBuffer {
@@ -13,15 +13,14 @@ func NewMsgBuffer () *MsgBuffer {
 }
 
 func (b *MsgBuffer) handle (cmd []string) {
-  b.textRows = cmd
+  b.text = cmd
 }
 
 func (b MsgBuffer) render (w Window) {
-  for i, s := range b.textRows {
-    w.Print(i, 0, fg1, bg1, s)
-  }
+  s := strings.Join(b.text, " ")
+  w.Print(0, 0, fg1, bg1, s)
 }
 
 func (b MsgBuffer) stringify () string {
-  return "msgBuffer:\n" + strings.Join(b.textRows, "\n") + "\n\n"
+  return "msgBuffer:\n" + strings.Join(b.text, "\n") + "\n\n"
 }

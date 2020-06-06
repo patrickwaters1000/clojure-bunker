@@ -11,22 +11,26 @@ type Editor struct {
   activeWindow int
   buffers []Buffer
   replClient *Client
+  sendEventFn func([]string)
 }
 
-func NewEditor() *Editor {
+func NewEditor(sendEventFn func([]string)) *Editor {
   rows, cols := get_winsize()
   w_full := NewWindow(rows, cols)
-  w_left, w_right := w_full.SplitVertically(cols / 2)
-  w_right_top, w_right_bottom := w_right.SplitHorizontally(rows / 2)
+  w_top, w_bottom := w_full.SplitHorizontally(rows - 3)
+  w_bl, w_br := w_bottom.SplitVertically(cols / 2)
   miniBuffer := NewMiniBuffer()
   msgBuffer := NewMsgBuffer()
-  w_right_top.buffer = miniBuffer
-  w_right_bottom.buffer = msgBuffer
+  w_bl.buffer = miniBuffer
+  w_br.buffer = msgBuffer
+  w_bl.canSelect = false
+  w_br.canSelect = false
   return &Editor{
-    windows: []*Window{w_left, w_right_top, w_right_bottom},
+    windows: []*Window{w_top, w_bl, w_br},
     activeWindow: 0,
     buffers: []Buffer{miniBuffer, msgBuffer},
     replClient: nil,
+    sendEventFn: sendEventFn,
   }
 }
 
@@ -80,8 +84,6 @@ func (e *Editor) CenterWindow () {
   e.getActiveWindow().Center(r)
 }
 
-
-
 func (e *Editor) render() {
   termbox.Clear(bg1, bg1)
   for _, w := range e.windows {
@@ -123,9 +125,15 @@ func (e *Editor) killBuffer() {
   e.getActiveWindow().buffer = nil
 }
 
-func (e *Editor) writeActiveBuffer(fname string) {
-  msg := stringifySubtree(e.getActiveBuffer().(*CodeBuffer).tree.Root)
-  err := ioutil.WriteFile(fname, []byte(msg), 0644)
+func (e *Editor) setActiveBufferFile (file string) {
+  b := e.getActiveBuffer()
+  b.(*CodeBuffer).file = file
+}
+
+func (e *Editor) writeActiveBuffer() {
+  b := e.getActiveBuffer()
+  msg := stringifySubtree(b.(*CodeBuffer).tree.Root)
+  err := ioutil.WriteFile(b.(*CodeBuffer).file, []byte(msg), 0644)
   panicIfError(err)
 }
 
@@ -137,6 +145,7 @@ func (e *Editor) loadFile(fname string) {
   _ = tree.DownFirst()
   b := NewCodeBuffer()
   b.name = fname
+  b.file = fname
   b.tree = tree
   b.setCursor(true)
   e.buffers = append(e.buffers, b)
@@ -153,17 +162,39 @@ func (e *Editor) replConnect(port string) {
 func (e *Editor) replEval() {
   activeBuffer := e.getActiveBuffer().(*CodeBuffer)
   activeNode := activeBuffer.tree.GetActive()
-  code := stringifySubtree(activeNode)
+  n := NewTreeNode(nil) // Awkwardly, stringifySubtree only uses
+  // the tree strictly below the given node
+  n.Children = append(n.Children, activeNode)
+  code := stringifySubtree(n)
   id := e.replClient.nextId
   e.replClient.Send(code)
   go func() {
     text, _ := e.replClient.GetResponse(id)
     e.getReplBuffer().text += (text + "\n\n")
+    e.sendEventFn([]string{"refresh"})
   }()
 }
 
 func (e *Editor) nextWindow () {
-  e.activeWindow += 1
+  n := len(e.windows)
+  e.activeWindow = mod(e.activeWindow + 1, n)
+  if e.getActiveWindow().canSelect == false {
+    e.nextWindow()
+  }
+}
+
+func (e *Editor) splitActiveWindowVertically () {
+  w := e.getActiveWindow()
+  iw := e.activeWindow // index of it
+  ib := e.getActiveBufferIndex()
+  nb := len(e.buffers)
+  wl, wr := w.SplitVertically(w.cols / 2)
+  wr.buffer = e.buffers[mod(ib + 1, nb)]
+  e.windows = append(
+    e.windows[:iw],
+    append(
+      []*Window{wl, wr},
+      e.windows[iw + 1:]...)...)
 }
 
 func (e *Editor) handle (event []string) {
@@ -173,15 +204,17 @@ func (e *Editor) handle (event []string) {
   case "new-buffer": e.newBuffer(event[1])
   case "next-buffer": e.nextBuffer()
   case "kill-buffer": e.killBuffer()
-  case "write-file": e.writeActiveBuffer(event[1])
+  case "set-file": e.setActiveBufferFile(event[1])
+  case "write-file": e.writeActiveBuffer()
   case "load-file": e.loadFile(event[1])
   case "set-mode": e.getActiveBuffer().handle(event)
   case "center-window": e.CenterWindow()
   case "repl-eval": e.replEval()
-  case "repl-connect": e.replConnect(event[2])
+  case "repl-connect": e.replConnect(event[1])
   case "window":
     switch event[1] {
     case "next": e.nextWindow()
+    case "split-vertical": e.splitActiveWindowVertically()
     }
   default: panic("Not found: " + event[0])
   }
